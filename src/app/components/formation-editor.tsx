@@ -3,6 +3,7 @@
 import { useState, useRef, ChangeEvent, FormEvent } from 'react';
 import { initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
 import type { Player } from '@/app/lib/types';
+import { formations7, formations11, Formation } from '@/app/lib/formations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Download, Upload, Plus, Pencil, Trash2 } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
@@ -24,18 +26,32 @@ export default function FormationEditor() {
   const [editName, setEditName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [selectedFormationName, setSelectedFormationName] = useState<string>(formations11[1].name);
 
   const handlePlayerCountChange = (value: string) => {
     const newCount = value === '7' ? 7 : 11;
     setPlayerCount(value);
     const newPlayers = value === '7' ? initialPlayers7 : initialPlayers11;
     setPlayers(newPlayers);
+
+    const newFormations = value === '7' ? formations7 : formations11;
+    setSelectedFormationName(newFormations[0].name);
+  };
+  
+  const handleFormationChange = (formationName: string) => {
+    const formations = playerCount === '7' ? formations7 : formations11;
+    const formation = formations.find(f => f.name === formationName);
+    if (formation) {
+      setPlayers(formation.players);
+      setSelectedFormationName(formationName);
+    }
   };
 
   const handlePlayerPositionChange = (id: string, position: { x: number; y: number }) => {
     setPlayers(prevPlayers =>
       prevPlayers.map(p => (p.id === id ? { ...p, position } : p))
     );
+    setSelectedFormationName("Custom");
   };
 
   const handleAddPlayer = () => {
@@ -53,10 +69,12 @@ export default function FormationEditor() {
       position: { x: 50, y: 50 },
     };
     setPlayers(prev => [...prev, newPlayer]);
+    setSelectedFormationName("Custom");
   };
   
   const handleRemovePlayer = (id: string) => {
     setPlayers(prev => prev.filter(p => p.id !== id));
+    setSelectedFormationName("Custom");
   };
 
   const handleStartEdit = (player: Player) => {
@@ -70,6 +88,7 @@ export default function FormationEditor() {
       setPlayers(prev => prev.map(p => (p.id === editingPlayer.id ? { ...p, name: editName } : p)));
       setEditingPlayer(null);
       setEditName('');
+      setSelectedFormationName("Custom");
     }
   };
 
@@ -100,6 +119,7 @@ export default function FormationEditor() {
           if (data.playerCount && data.players) {
             setPlayerCount(data.playerCount.toString());
             setPlayers(data.players);
+            setSelectedFormationName("Custom");
             toast({ title: "Success", description: "Formation imported successfully." });
           } else {
             throw new Error("Invalid file format");
@@ -113,6 +133,8 @@ export default function FormationEditor() {
     // Reset file input value to allow re-uploading the same file
     if (e.target) e.target.value = '';
   };
+
+  const currentFormations = playerCount === '7' ? formations7 : formations11;
   
   return (
     <TooltipProvider>
@@ -145,14 +167,30 @@ export default function FormationEditor() {
               </div>
             </header>
 
-            <div className="p-4">
-              <Label className="text-sm font-medium mb-2 block">Game Type</Label>
-              <Tabs value={playerCount} onValueChange={handlePlayerCountChange}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="11">11-a-side</TabsTrigger>
-                  <TabsTrigger value="7">7-a-side</TabsTrigger>
-                </TabsList>
-              </Tabs>
+            <div className="p-4 space-y-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Game Type</Label>
+                <Tabs value={playerCount} onValueChange={handlePlayerCountChange}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="11">11-a-side</TabsTrigger>
+                    <TabsTrigger value="7">7-a-side</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+               <div>
+                <Label className="text-sm font-medium mb-2 block">Formation</Label>
+                <Select value={selectedFormationName} onValueChange={handleFormationChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select formation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currentFormations.map(f => (
+                      <SelectItem key={f.name} value={f.name}>{f.name}</SelectItem>
+                    ))}
+                     <SelectItem value="Custom" disabled>Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             
             <Separator />

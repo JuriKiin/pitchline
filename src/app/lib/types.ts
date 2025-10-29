@@ -3,3 +3,8 @@ export interface Player {
   name: string;
   position: { x: number; y: number }; // Percentage-based position
 }
+
+export interface Formation {
+  name: string;
+  players: Player[];
+}
