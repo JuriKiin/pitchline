@@ -1,15 +1,16 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { DragEvent, useRef, useState } from 'react';
 import type { Player } from '@/app/lib/types';
 import PlayerToken from './player-token';
 
 interface FormationCanvasProps {
   players: Player[];
   onPlayerPositionChange: (id: string, position: { x: number; y: number }) => void;
+  onPlayerDrop: (e: DragEvent, targetPlayerId: string) => void;
 }
 
-export default function FormationCanvas({ players, onPlayerPositionChange }: FormationCanvasProps) {
+export default function FormationCanvas({ players, onPlayerPositionChange, onPlayerDrop }: FormationCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
 
@@ -39,12 +40,34 @@ export default function FormationCanvas({ players, onPlayerPositionChange }: For
     setDraggedPlayerId(player.id);
   };
 
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    if (!canvasRef.current) return;
+    // This drop is on the canvas, not a token. It implies moving a player.
+    const playerId = e.dataTransfer.getData("playerId");
+    if (!playerId) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const newXPercent = (x / rect.width) * 100;
+    const newYPercent = (y / rect.height) * 100;
+    
+    onPlayerPositionChange(playerId, { x: newXPercent, y: newYPercent });
+  };
+
   return (
     <div className="relative w-full h-full bg-accent/30 dark:bg-accent/20 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden"
       ref={canvasRef}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       {/* Field Markings */}
       <div className="absolute top-1/2 left-0 w-full h-px bg-white/30 -translate-y-1/2" />
@@ -59,8 +82,10 @@ export default function FormationCanvas({ players, onPlayerPositionChange }: For
           player={player}
           onMouseDown={handleMouseDownOnToken}
           isDragged={draggedPlayerId === player.id}
+          onDrop={(e) => onPlayerDrop(e, player.id)}
         />
       ))}
     </div>
   );
 }
+    

@@ -1,5 +1,6 @@
 'use client';
 
+import { DragEvent } from 'react';
 import type { Player } from '@/app/lib/types';
 import { cn } from '@/lib/utils';
 import { User } from 'lucide-react';
@@ -8,9 +9,19 @@ interface PlayerTokenProps {
   player: Player;
   onMouseDown: (e: React.MouseEvent<HTMLDivElement>, player: Player) => void;
   isDragged: boolean;
+  onDrop: (e: DragEvent) => void;
 }
 
-export default function PlayerToken({ player, onMouseDown, isDragged }: PlayerTokenProps) {
+export default function PlayerToken({ player, onMouseDown, isDragged, onDrop }: PlayerTokenProps) {
+  
+  const handleDragStart = (e: DragEvent) => {
+    e.dataTransfer.setData("playerId", player.id);
+  };
+  
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+  };
+
   return (
     <div
       key={player.id}
@@ -24,9 +35,15 @@ export default function PlayerToken({ player, onMouseDown, isDragged }: PlayerTo
       }}
       onMouseDown={(e) => onMouseDown(e, player)}
       title={player.name}
+      draggable
+      onDragStart={handleDragStart}
+      onDrop={onDrop}
+      onDragOver={handleDragOver}
     >
       <User className="w-5 h-5 mb-0.5" />
-      <span className="text-xs font-semibold truncate max-w-full">{player.name}</span>
+      <span className="text-xs font-medium leading-tight truncate w-full px-1">{player.name}</span>
     </div>
   );
 }
+
+    

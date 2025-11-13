@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, FormEvent } from 'react';
+import { useState, useRef, ChangeEvent, FormEvent, DragEvent } from 'react';
 import { initialPlayers6, initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
 import type { Player } from '@/app/lib/types';
 import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -27,6 +27,9 @@ export default function FormationEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [selectedFormationName, setSelectedFormationName] = useState<string>(formations11[1].name);
+
+  const activePlayers = players.filter(p => !p.isBenched);
+  const benchedPlayers = players.filter(p => p.isBenched);
 
   const handlePlayerCountChange = (value: string) => {
     setPlayerCount(value);
@@ -60,37 +63,54 @@ export default function FormationEditor() {
 
     const formation = formations.find(f => f.name === formationName);
     if (formation) {
-      setPlayers(formation.players);
+      // Keep benched players, but replace active players with formation players
+      const currentBenched = players.filter(p => p.isBenched);
+      const formationPlayers = formation.players.map(p => ({...p, isBenched: false}));
+      const maxActive = parseInt(playerCount, 10);
+      
+      // If we have too many players, bench some from the old formation
+      const combined = [...formationPlayers, ...currentBenched];
+      const active = combined.filter(p => !p.isBenched);
+      const benched = combined.filter(p => p.isBenched);
+
+      while (active.length > maxActive) {
+        const playerToBench = active.pop();
+        if(playerToBench) {
+          playerToBench.isBenched = true;
+          benched.unshift(playerToBench);
+        }
+      }
+
+      setPlayers([...active, ...benched]);
       setSelectedFormationName(formationName);
     }
   };
 
   const handlePlayerPositionChange = (id: string, position: { x: number; y: number }) => {
     setPlayers(prevPlayers =>
-      prevPlayers.map(p => (p.id === id ? { ...p, position } : p))
+      prevPlayers.map(p => (p.id === id ? { ...p, position, isBenched: false } : p))
     );
     setSelectedFormationName("Custom");
   };
 
   const handleAddPlayer = () => {
-    const maxPlayers = parseInt(playerCount, 10);
-    if (players.length >= maxPlayers) {
-      toast({ title: "Maximum players reached", description: `You can't have more than ${maxPlayers} players in this formation.`, variant: 'destructive' });
-      return;
-    }
-    
     const newPlayer: Player = {
       id: `p${Date.now()}`,
       name: 'New Player',
       position: { x: 50, y: 50 },
+      isBenched: activePlayers.length >= parseInt(playerCount, 10),
     };
     setPlayers(prev => [...prev, newPlayer]);
-    setSelectedFormationName("Custom");
+    if (!newPlayer.isBenched) {
+      setSelectedFormationName("Custom");
+    }
   };
   
   const handleRemovePlayer = (id: string) => {
     setPlayers(prev => prev.filter(p => p.id !== id));
-    setSelectedFormationName("Custom");
+    if (activePlayers.some(p => p.id === id)) {
+      setSelectedFormationName("Custom");
+    }
   };
 
   const handleStartEdit = (player: Player) => {
@@ -104,7 +124,9 @@ export default function FormationEditor() {
       setPlayers(prev => prev.map(p => (p.id === editingPlayer.id ? { ...p, name: editName } : p)));
       setEditingPlayer(null);
       setEditName('');
-      setSelectedFormationName("Custom");
+      if (!editingPlayer.isBenched) {
+        setSelectedFormationName("Custom");
+      }
     }
   };
 
@@ -134,7 +156,9 @@ export default function FormationEditor() {
           const data = JSON.parse(event.target?.result as string);
           if (data.playerCount && data.players) {
             setPlayerCount(data.playerCount.toString());
-            setPlayers(data.players);
+            // Ensure isBenched property exists
+            const importedPlayers = data.players.map((p: Player) => ({ ...p, isBenched: p.isBenched || false }));
+            setPlayers(importedPlayers);
             setSelectedFormationName("Custom");
             toast({ title: "Success", description: "Formation imported successfully." });
           } else {
@@ -146,8 +170,36 @@ export default function FormationEditor() {
       };
       reader.readAsText(file);
     }
-    // Reset file input value to allow re-uploading the same file
     if (e.target) e.target.value = '';
+  };
+
+  const handleDragStart = (e: DragEvent, playerId: string) => {
+    e.dataTransfer.setData("playerId", playerId);
+  };
+
+  const handleDropOnPlayer = (e: DragEvent, targetPlayerId: string) => {
+    e.preventDefault();
+    const sourcePlayerId = e.dataTransfer.getData("playerId");
+    if (sourcePlayerId === targetPlayerId) return;
+
+    setPlayers(prev => {
+      const sourcePlayer = prev.find(p => p.id === sourcePlayerId);
+      const targetPlayer = prev.find(p => p.id === targetPlayerId);
+
+      if (!sourcePlayer || !targetPlayer) return prev;
+
+      // Swap their benched status and positions
+      return prev.map(p => {
+        if (p.id === sourcePlayerId) {
+          return { ...p, isBenched: targetPlayer.isBenched, position: targetPlayer.position };
+        }
+        if (p.id === targetPlayerId) {
+          return { ...p, isBenched: sourcePlayer.isBenched, position: sourcePlayer.position };
+        }
+        return p;
+      });
+    });
+    setSelectedFormationName("Custom");
   };
 
   let currentFormations: Formation[];
@@ -159,6 +211,35 @@ export default function FormationEditor() {
     currentFormations = formations11;
   }
   
+  const PlayerListItem = ({ player }: { player: Player }) => (
+    <li
+      key={player.id}
+      className="flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 transition-colors cursor-grab"
+      draggable
+      onDragStart={(e) => handleDragStart(e, player.id)}
+      onDrop={(e) => handleDropOnPlayer(e, player.id)}
+      onDragOver={(e) => e.preventDefault()}
+    >
+      <span className="flex-1 font-medium truncate">{player.name}</span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => handleStartEdit(player)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Edit Name</p></TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" onClick={() => handleRemovePlayer(player.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Remove Player</p></TooltipContent>
+      </Tooltip>
+    </li>
+  );
+
   return (
     <TooltipProvider>
       <div className="flex flex-col md:flex-row h-screen bg-background text-foreground overflow-hidden">
@@ -222,32 +303,38 @@ export default function FormationEditor() {
             <div className="flex-1 min-h-0">
               <ScrollArea className="h-full">
                 <Card className="border-0 shadow-none rounded-none">
-                  <CardContent className="p-4">
+                  <CardHeader className="pt-4 pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Starting XI ({activePlayers.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2">
                     <ul className="space-y-2">
-                      {players.map(player => (
-                        <li key={player.id} className="flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 transition-colors">
-                          <span className="flex-1 font-medium truncate">{player.name}</span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEdit(player)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Edit Name</p></TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive" onClick={() => handleRemovePlayer(player.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Remove Player</p></TooltipContent>
-                          </Tooltip>
-                        </li>
+                      {activePlayers.map(player => (
+                        <PlayerListItem key={player.id} player={player} />
                       ))}
                     </ul>
                   </CardContent>
                 </Card>
+                
+                  <Separator />
+                  <Card className="border-0 shadow-none rounded-none">
+                    <CardHeader className="pt-4 pb-2">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Users className="h-5 w-5 text-muted-foreground" />
+                        Bench ({benchedPlayers.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2">
+                      <ul className="space-y-2">
+                        {benchedPlayers.map(player => (
+                          <PlayerListItem key={player.id} player={player} />
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                
               </ScrollArea>
             </div>
 
@@ -258,7 +345,11 @@ export default function FormationEditor() {
         </aside>
 
         <main className="flex-1 p-4 md:p-6 bg-muted/30 dark:bg-card/20">
-          <FormationCanvas players={players} onPlayerPositionChange={handlePlayerPositionChange} />
+          <FormationCanvas 
+            players={activePlayers} 
+            onPlayerPositionChange={handlePlayerPositionChange}
+            onPlayerDrop={handleDropOnPlayer}
+            />
         </main>
 
         <Dialog open={!!editingPlayer} onOpenChange={(isOpen) => !isOpen && setEditingPlayer(null)}>
@@ -283,3 +374,5 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
+
+    
