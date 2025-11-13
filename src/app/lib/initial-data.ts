@@ -25,3 +25,13 @@ export const initialPlayers7: Player[] = [
   { id: 'p6', name: 'Midfielder', position: { x: 20, y: 60 } },
   { id: 'p7', name: 'Forward', position: { x: 50, y: 85 } },
 ];
+
+// Default 6-player formation (e.g., 2-2-1)
+export const initialPlayers6: Player[] = [
+  { id: 'p1', name: 'Goalkeeper', position: { x: 50, y: 10 } },
+  { id: 'p2', name: 'Defender', position: { x: 70, y: 35 } },
+  { id: 'p3', name: 'Defender', position: { x: 30, y: 35 } },
+  { id: 'p4', name: 'Midfielder', position: { x: 75, y: 65 } },
+  { id: 'p5', name: 'Midfielder', position: { x: 25, y: 65 } },
+  { id: 'p6', name: 'Forward', position: { x: 50, y: 85 } },
+];

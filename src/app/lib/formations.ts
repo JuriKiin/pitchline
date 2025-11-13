@@ -94,3 +94,39 @@ export const formations7: Formation[] = [
         ],
     }
 ];
+
+export const formations6: Formation[] = [
+    {
+        name: '2-2-1',
+        players: [
+            { id: 'p1', name: 'Goalkeeper', position: { x: 50, y: 10 } },
+            { id: 'p2', name: 'Defender', position: { x: 70, y: 35 } },
+            { id: 'p3', name: 'Defender', position: { x: 30, y: 35 } },
+            { id: 'p4', name: 'Midfielder', position: { x: 75, y: 65 } },
+            { id: 'p5', name: 'Midfielder', position: { x: 25, y: 65 } },
+            { id: 'p6', name: 'Forward', position: { x: 50, y: 85 } },
+        ],
+    },
+    {
+        name: '2-1-2',
+        players: [
+            { id: 'p1', name: 'Goalkeeper', position: { x: 50, y: 10 } },
+            { id: 'p2', name: 'Defender', position: { x: 70, y: 30 } },
+            { id: 'p3', name: 'Defender', position: { x: 30, y: 30 } },
+            { id: 'p4', name: 'Midfielder', position: { x: 50, y: 55 } },
+            { id: 'p5', name: 'Forward', position: { x: 70, y: 80 } },
+            { id: 'p6', name: 'Forward', position: { x: 30, y: 80 } },
+        ],
+    },
+     {
+        name: '1-3-1',
+        players: [
+            { id: 'p1', name: 'Goalkeeper', position: { x: 50, y: 10 } },
+            { id: 'p2', name: 'Defender', position: { x: 50, y: 30 } },
+            { id: 'p3', name: 'Midfielder', position: { x: 80, y: 55 } },
+            { id: 'p4', name: 'Midfielder', position: { x: 50, y: 50 } },
+            { id: 'p5', name: 'Midfielder', position: { x: 20, y: 55 } },
+            { id: 'p6', name: 'Forward', position: { x: 50, y: 85 } },
+        ],
+    }
+];

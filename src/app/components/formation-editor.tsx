@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useRef, ChangeEvent, FormEvent } from 'react';
-import { initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
+import { initialPlayers6, initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
 import type { Player } from '@/app/lib/types';
-import { formations7, formations11, Formation } from '@/app/lib/formations';
+import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,17 +29,35 @@ export default function FormationEditor() {
   const [selectedFormationName, setSelectedFormationName] = useState<string>(formations11[1].name);
 
   const handlePlayerCountChange = (value: string) => {
-    const newCount = value === '7' ? 7 : 11;
     setPlayerCount(value);
-    const newPlayers = value === '7' ? initialPlayers7 : initialPlayers11;
+    let newPlayers: Player[];
+    let newFormations: Formation[];
+    
+    if (value === '6') {
+      newPlayers = initialPlayers6;
+      newFormations = formations6;
+    } else if (value === '7') {
+      newPlayers = initialPlayers7;
+      newFormations = formations7;
+    } else {
+      newPlayers = initialPlayers11;
+      newFormations = formations11;
+    }
+    
     setPlayers(newPlayers);
-
-    const newFormations = value === '7' ? formations7 : formations11;
     setSelectedFormationName(newFormations[0].name);
   };
   
   const handleFormationChange = (formationName: string) => {
-    const formations = playerCount === '7' ? formations7 : formations11;
+    let formations: Formation[];
+    if (playerCount === '6') {
+      formations = formations6;
+    } else if (playerCount === '7') {
+      formations = formations7;
+    } else {
+      formations = formations11;
+    }
+
     const formation = formations.find(f => f.name === formationName);
     if (formation) {
       setPlayers(formation.players);
@@ -55,14 +73,12 @@ export default function FormationEditor() {
   };
 
   const handleAddPlayer = () => {
-    if (players.length >= 11 && playerCount === '11') {
-      toast({ title: "Maximum players reached", description: "You can't have more than 11 players in this formation.", variant: 'destructive' });
+    const maxPlayers = parseInt(playerCount, 10);
+    if (players.length >= maxPlayers) {
+      toast({ title: "Maximum players reached", description: `You can't have more than ${maxPlayers} players in this formation.`, variant: 'destructive' });
       return;
     }
-    if (players.length >= 7 && playerCount === '7') {
-      toast({ title: "Maximum players reached", description: "You can't have more than 7 players in this formation.", variant: 'destructive' });
-      return;
-    }
+    
     const newPlayer: Player = {
       id: `p${Date.now()}`,
       name: 'New Player',
@@ -134,7 +150,14 @@ export default function FormationEditor() {
     if (e.target) e.target.value = '';
   };
 
-  const currentFormations = playerCount === '7' ? formations7 : formations11;
+  let currentFormations: Formation[];
+  if (playerCount === '6') {
+    currentFormations = formations6;
+  } else if (playerCount === '7') {
+    currentFormations = formations7;
+  } else {
+    currentFormations = formations11;
+  }
   
   return (
     <TooltipProvider>
@@ -171,9 +194,10 @@ export default function FormationEditor() {
               <div>
                 <Label className="text-sm font-medium mb-2 block">Game Type</Label>
                 <Tabs value={playerCount} onValueChange={handlePlayerCountChange}>
-                  <TabsList className="grid w-full grid-cols-2">
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="11">11-a-side</TabsTrigger>
                     <TabsTrigger value="7">7-a-side</TabsTrigger>
+                    <TabsTrigger value="6">6-a-side</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
