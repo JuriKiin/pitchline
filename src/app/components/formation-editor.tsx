@@ -310,11 +310,15 @@ export default function FormationEditor() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 pt-2">
-                    <ul className="space-y-2">
-                      {activePlayers.map(player => (
-                        <PlayerListItem key={player.id} player={player} />
-                      ))}
-                    </ul>
+                    {activePlayers.length > 0 ? (
+                      <ul className="space-y-2">
+                        {activePlayers.map(player => (
+                          <PlayerListItem key={player.id} player={player} />
+                        ))}
+                      </ul>
+                    ) : (
+                       <p className="text-sm text-muted-foreground">No players on the field.</p>
+                    )}
                   </CardContent>
                 </Card>
                 
@@ -327,11 +331,15 @@ export default function FormationEditor() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-2">
-                      <ul className="space-y-2">
-                        {benchedPlayers.map(player => (
-                          <PlayerListItem key={player.id} player={player} />
-                        ))}
-                      </ul>
+                     {benchedPlayers.length > 0 ? (
+                        <ul className="space-y-2">
+                          {benchedPlayers.map(player => (
+                            <PlayerListItem key={player.id} player={player} />
+                          ))}
+                        </ul>
+                       ) : (
+                         <p className="text-sm text-muted-foreground">The bench is empty.</p>
+                       )}
                     </CardContent>
                   </Card>
                 
@@ -374,5 +382,3 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
-
-    
