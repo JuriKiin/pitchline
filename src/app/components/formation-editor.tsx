@@ -60,6 +60,12 @@ const initialPlayerConfigs: PlayerConfigs = {
   '6': { attacking: initialPlayers6, defending: JSON.parse(JSON.stringify(initialPlayers6)) },
 };
 
+const positionOptions = [
+  "GK", "CB", "LB", "RB", "LWB", "RWB", 
+  "CDM", "CM", "CAM", "LM", "RM", 
+  "LW", "RW", "ST", "CF", "SUB"
+];
+
 export default function FormationEditor() {
   const [playerConfigs, setPlayerConfigs] = useState<PlayerConfigs>(initialPlayerConfigs);
   const [playerCount, setPlayerCount] = useState<PlayerCount>('11');
@@ -658,7 +664,16 @@ export default function FormationEditor() {
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="positionName" className="text-right">Position</Label>
-                  <Input id="positionName" value={editPositionName} onChange={(e) => setEditPositionName(e.target.value)} className="col-span-3" />
+                  <Select value={editPositionName} onValueChange={setEditPositionName}>
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select a position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {positionOptions.map(pos => (
+                        <SelectItem key={pos} value={pos}>{pos}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>
