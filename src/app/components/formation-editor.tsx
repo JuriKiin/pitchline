@@ -6,7 +6,7 @@ import type { Player } from '@/app/lib/types';
 import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,7 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/comp
 import { Separator } from '@/components/ui/separator';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarProvider, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
 
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -76,13 +77,12 @@ export default function FormationEditor() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareableLink, setShareableLink] = useState('');
   
-  // Load from URL on initial render
   useEffect(() => {
     const hash = window.location.hash.slice(1);
     if (hash) {
       try {
         const decoded = atob(hash);
-        const data: SharedFormation | any = JSON.parse(decoded);
+        const data: SharedFormation = JSON.parse(decoded);
         if (data.playerCount && data.config && data.formationNames) {
           setPlayerCount(data.playerCount);
           setPlayerConfigs(prev => ({
@@ -94,11 +94,6 @@ export default function FormationEditor() {
             [data.playerCount]: data.formationNames,
           }));
           toast({ title: "Shared formation loaded!", description: `The ${data.playerCount}-a-side formation has been loaded.` });
-          window.history.pushState("", document.title, window.location.pathname + window.location.search);
-        } else if (data.playerConfigs && data.selectedFormationNames) { // Legacy link support for full setup
-          setPlayerConfigs(data.playerConfigs);
-          setSelectedFormationNames(data.selectedFormationNames);
-          toast({ title: "Shared formation loaded!", description: "The formation from the link has been loaded." });
           window.history.pushState("", document.title, window.location.pathname + window.location.search);
         }
       } catch (e) {
@@ -153,7 +148,7 @@ export default function FormationEditor() {
       ...prev,
       [playerCount]: {
         ...prev[playerCount],
-        [playPhase]: JSON.parse(JSON.stringify(initialPlayers)) // deep copy
+        [playPhase]: JSON.parse(JSON.stringify(initialPlayers))
       }
     }));
     
@@ -418,7 +413,7 @@ export default function FormationEditor() {
       onTouchStart={() => handleTouchStart(player.id)}
       onTouchEnd={(e) => handleTouchEndOnPlayer(e, player.id)}
     >
-      <span className="flex-1 font-medium">{player.name}</span>
+      <span className="flex-1 font-medium truncate">{player.name}</span>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => handleStartEdit(player)}>
@@ -446,10 +441,10 @@ export default function FormationEditor() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col md:flex-row h-screen bg-background text-foreground overflow-hidden">
-        <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r flex-shrink-0">
-          <div className="flex flex-col h-full">
-            <header className="p-4 flex items-center justify-between border-b">
+      <SidebarProvider>
+        <Sidebar>
+          <SidebarHeader>
+             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Logo className="h-8 w-8 text-primary" />
                 <h1 className="text-xl font-bold">Footy Formation</h1>
@@ -481,16 +476,17 @@ export default function FormationEditor() {
                 </Tooltip>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".txt,application/json" className="hidden" />
               </div>
-            </header>
-
-            <div className="p-4 space-y-4">
+            </div>
+          </SidebarHeader>
+          <SidebarContent>
+             <div className="p-4 space-y-4">
               <div className='flex items-end gap-2'>
                 <div className='flex-1'>
                   <Label className="text-sm font-medium mb-2 block">Saved Setups</Label>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="w-full justify-between">
-                        <span>{Object.keys(savedSetups).length > 0 ? "Load Setup" : "No Setups"}</span> <Users className="h-4 w-4" />
+                        <span className="truncate">{Object.keys(savedSetups).length > 0 ? "Load Setup" : "No Setups"}</span> <Users className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-64">
@@ -545,84 +541,90 @@ export default function FormationEditor() {
             
             <Separator />
 
-            <div className="flex-1 min-h-0">
-              <ScrollArea className="h-full">
-                <Card className="border-0 shadow-none rounded-none">
-                  <CardHeader className="pt-4 pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Starting XI ({activePlayers.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-2">
-                    {activePlayers.length > 0 ? (
-                      <ul className="space-y-2">
-                        {activePlayers.map(player => (
-                          <PlayerListItem key={player.id} player={player} />
-                        ))}
-                      </ul>
+             <ScrollArea className="h-full">
+              <Card className="border-0 shadow-none rounded-none">
+                <CardHeader className="pt-4 pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Starting XI ({activePlayers.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-2">
+                  {activePlayers.length > 0 ? (
+                    <ul className="space-y-2">
+                      {activePlayers.map(player => (
+                        <PlayerListItem key={player.id} player={player} />
+                      ))}
+                    </ul>
+                  ) : (
+                      <p className="text-sm text-muted-foreground">No players on the field.</p>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Separator />
+              <Card className="border-0 shadow-none rounded-none">
+                <CardHeader className="pt-4 pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    Bench ({benchedPlayers.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-2">
+                  {benchedPlayers.length > 0 ? (
+                    <ul className="space-y-2">
+                      {benchedPlayers.map(player => (
+                        <PlayerListItem key={player.id} player={player} />
+                      ))}
+                    </ul>
                     ) : (
-                       <p className="text-sm text-muted-foreground">No players on the field.</p>
+                      <p className="text-sm text-muted-foreground">The bench is empty.</p>
                     )}
-                  </CardContent>
-                </Card>
-                
-                  <Separator />
-                  <Card className="border-0 shadow-none rounded-none">
-                    <CardHeader className="pt-4 pb-2">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Users className="h-5 w-5 text-muted-foreground" />
-                        Bench ({benchedPlayers.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-2">
-                     {benchedPlayers.length > 0 ? (
-                        <ul className="space-y-2">
-                          {benchedPlayers.map(player => (
-                            <PlayerListItem key={player.id} player={player} />
-                          ))}
-                        </ul>
-                       ) : (
-                         <p className="text-sm text-muted-foreground">The bench is empty.</p>
-                       )}
-                    </CardContent>
-                  </Card>
-                
-              </ScrollArea>
-            </div>
+                </CardContent>
+              </Card>
+            </ScrollArea>
 
-            <div className="p-4 border-t">
-              <Button className="w-full" onClick={handleAddPlayer}><Plus className="mr-2 h-4 w-4" /> Add Player</Button>
-            </div>
+          </SidebarContent>
+          <SidebarFooter>
+             <Button className="w-full" onClick={handleAddPlayer}><Plus className="mr-2 h-4 w-4" /> Add Player</Button>
+          </SidebarFooter>
+        </Sidebar>
+        
+        <SidebarInset>
+          <div className="flex-1 flex flex-col h-screen max-h-screen overflow-hidden">
+            <header className="p-2 flex items-center gap-2 md:hidden border-b">
+              <SidebarTrigger />
+              <h2 className="text-lg font-semibold">Formation Controls</h2>
+            </header>
+
+            <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/30 dark:bg-card/20">
+                <div className="flex justify-center items-center mb-4 gap-4">
+                  <Tabs value={playPhase} onValueChange={handlePhaseChange} className="w-full max-w-sm">
+                      <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="attacking">Attacking</TabsTrigger>
+                          <TabsTrigger value="defending">Defending</TabsTrigger>
+                      </TabsList>
+                  </Tabs>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="icon" onClick={handleResetFormation}>
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Reset Formation</p></TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="flex-1">
+                    <FormationCanvas 
+                        players={activePlayers}
+                        previousPlayers={previousPlayerConfig.current?.filter(p => !p.isBenched) || []}
+                        onPlayerPositionChange={handlePlayerPositionChange}
+                        onPlayerDrop={handleDropOnPlayer}
+                    />
+                </div>
+            </main>
           </div>
-        </aside>
-
-        <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/30 dark:bg-card/20">
-            <div className="flex justify-center items-center mb-4 gap-4">
-              <Tabs value={playPhase} onValueChange={handlePhaseChange} className="w-full max-w-sm">
-                  <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="attacking">Attacking</TabsTrigger>
-                      <TabsTrigger value="defending">Defending</TabsTrigger>
-                  </TabsList>
-              </Tabs>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={handleResetFormation}>
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Reset Formation</p></TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="flex-1">
-                <FormationCanvas 
-                    players={activePlayers}
-                    previousPlayers={previousPlayerConfig.current?.filter(p => !p.isBenched) || []}
-                    onPlayerPositionChange={handlePlayerPositionChange}
-                    onPlayerDrop={handleDropOnPlayer}
-                />
-            </div>
-        </main>
+        </SidebarInset>
 
         <Dialog open={!!editingPlayer} onOpenChange={(isOpen) => !isOpen && setEditingPlayer(null)}>
           <DialogContent>
@@ -677,7 +679,7 @@ export default function FormationEditor() {
           </DialogContent>
         </Dialog>
 
-      </div>
+      </SidebarProvider>
     </TooltipProvider>
   );
 }
