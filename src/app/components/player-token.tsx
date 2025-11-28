@@ -7,15 +7,18 @@ import { User } from 'lucide-react';
 
 interface PlayerTokenProps {
   player: Player;
-  onMouseDown: (e: React.MouseEvent<HTMLDivElement>, player: Player) => void;
+  onInteractionStart: (player: Player) => void;
   isDragged: boolean;
   onDrop: (e: DragEvent) => void;
 }
 
-export default function PlayerToken({ player, onMouseDown, isDragged, onDrop }: PlayerTokenProps) {
+export default function PlayerToken({ player, onInteractionStart, isDragged, onDrop }: PlayerTokenProps) {
   
   const handleDragStart = (e: DragEvent) => {
-    e.dataTransfer.setData("playerId", player.id);
+    // Only allow drag for non-touch devices to avoid conflicts
+    if (e.pointerType !== 'touch') {
+      e.dataTransfer.setData("playerId", player.id);
+    }
   };
   
   const handleDragOver = (e: DragEvent) => {
@@ -33,7 +36,16 @@ export default function PlayerToken({ player, onMouseDown, isDragged, onDrop }: 
         left: `calc(${player.position.x}% - 2rem)`,
         top: `calc(${player.position.y}% - 2rem)`,
       }}
-      onMouseDown={(e) => onMouseDown(e, player)}
+      onMouseDown={(e) => {
+        // Prevent text selection and default drag behavior on mouse down
+        e.preventDefault();
+        onInteractionStart(player);
+      }}
+      onTouchStart={(e) => {
+        // Prevent scrolling and other default touch actions
+        e.preventDefault();
+        onInteractionStart(player);
+      }}
       title={player.name}
       draggable
       onDragStart={handleDragStart}
@@ -45,5 +57,3 @@ export default function PlayerToken({ player, onMouseDown, isDragged, onDrop }: 
     </div>
   );
 }
-
-    
