@@ -6,11 +6,12 @@ import PlayerToken from './player-token';
 
 interface FormationCanvasProps {
   players: Player[];
+  previousPlayers: Player[];
   onPlayerPositionChange: (id: string, position: { x: number; y: number }) => void;
   onPlayerDrop: (e: DragEvent, targetPlayerId: string) => void;
 }
 
-export default function FormationCanvas({ players, onPlayerPositionChange, onPlayerDrop }: FormationCanvasProps) {
+export default function FormationCanvas({ players, previousPlayers, onPlayerPositionChange, onPlayerDrop }: FormationCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);
 
@@ -21,7 +22,7 @@ export default function FormationCanvas({ players, onPlayerPositionChange, onPla
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const tokenHalfWidth = 32; // Corresponds to w-16 -> 4rem -> 64px, half is 32px
+    const tokenHalfWidth = 32;
     const clampedX = Math.max(tokenHalfWidth, Math.min(x, rect.width - tokenHalfWidth));
     const clampedY = Math.max(tokenHalfWidth, Math.min(y, rect.height - tokenHalfWidth));
     
@@ -72,7 +73,6 @@ export default function FormationCanvas({ players, onPlayerPositionChange, onPla
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     if (!canvasRef.current) return;
-    // This drop is on the canvas, not a token. It implies moving a player.
     const playerId = e.dataTransfer.getData("playerId");
     if (!playerId) return;
 
@@ -104,16 +104,22 @@ export default function FormationCanvas({ players, onPlayerPositionChange, onPla
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[35%] h-[18%] border-2 border-white/30 border-t-0 rounded-b-xl" />
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[35%] h-[18%] border-2 border-white/30 border-b-0 rounded-t-xl" />
       
-      {players.map(player => (
-        <PlayerToken
-          key={player.id}
-          player={player}
-          onMouseDown={() => handleMouseDown(player)}
-          onTouchStart={() => handleTouchStart(player)}
-          isDragged={draggedPlayer?.id === player.id}
-          onDrop={(e) => onPlayerDrop(e, player.id)}
-        />
-      ))}
+      {players.map(player => {
+        const previousPlayer = previousPlayers.find(p => p.id === player.id);
+        const oldPosition = previousPlayer ? previousPlayer.position : player.position;
+
+        return (
+          <PlayerToken
+            key={player.id}
+            player={player}
+            oldPosition={oldPosition}
+            onMouseDown={() => handleMouseDown(player)}
+            onTouchStart={() => handleTouchStart(player)}
+            isDragged={draggedPlayer?.id === player.id}
+            onDrop={(e) => onPlayerDrop(e, player.id)}
+          />
+        )
+      })}
     </div>
   );
 }

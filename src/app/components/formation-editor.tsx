@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, FormEvent, DragEvent, TouchEvent } from 'react';
+import { useState, useRef, ChangeEvent, FormEvent, DragEvent, TouchEvent, useEffect } from 'react';
 import { initialPlayers6, initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
 import type { Player } from '@/app/lib/types';
 import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
@@ -13,11 +13,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Separator } from '@/components/ui/separator';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -33,12 +35,25 @@ interface PlayerConfigs {
   '6': PhasePlayers;
 }
 
+interface FormationSetup {
+  playerConfigs: PlayerConfigs;
+  selectedFormationNames: Record<PlayerCount, Record<PlayPhase, string>>;
+}
+
+const initialFormationNames = {
+  '11': { attacking: formations11[1].name, defending: formations11[1].name },
+  '7': { attacking: formations7[0].name, defending: formations7[0].name },
+  '6': { attacking: formations6[0].name, defending: formations6[0].name },
+};
+
+const initialPlayerConfigs: PlayerConfigs = {
+  '11': { attacking: initialPlayers11, defending: JSON.parse(JSON.stringify(initialPlayers11)) },
+  '7': { attacking: initialPlayers7, defending: JSON.parse(JSON.stringify(initialPlayers7)) },
+  '6': { attacking: initialPlayers6, defending: JSON.parse(JSON.stringify(initialPlayers6)) },
+};
+
 export default function FormationEditor() {
-  const [playerConfigs, setPlayerConfigs] = useState<PlayerConfigs>({
-    '11': { attacking: initialPlayers11, defending: JSON.parse(JSON.stringify(initialPlayers11)) },
-    '7': { attacking: initialPlayers7, defending: JSON.parse(JSON.stringify(initialPlayers7)) },
-    '6': { attacking: initialPlayers6, defending: JSON.parse(JSON.stringify(initialPlayers6)) },
-  });
+  const [playerConfigs, setPlayerConfigs] = useState<PlayerConfigs>(initialPlayerConfigs);
   const [playerCount, setPlayerCount] = useState<PlayerCount>('11');
   const [playPhase, setPlayPhase] = useState<PlayPhase>('attacking');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -47,11 +62,34 @@ export default function FormationEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
-  const [selectedFormationNames, setSelectedFormationNames] = useState({
-    '11': { attacking: formations11[1].name, defending: formations11[1].name },
-    '7': { attacking: formations7[0].name, defending: formations7[0].name },
-    '6': { attacking: formations6[0].name, defending: formations6[0].name },
-  });
+  const [selectedFormationNames, setSelectedFormationNames] = useState(initialFormationNames);
+
+  const [savedSetups, setSavedSetups] = useLocalStorage<Record<string, FormationSetup>>('footy-formation-setups', {});
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [newSetupName, setNewSetupName] = useState('');
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareableLink, setShareableLink] = useState('');
+  
+  // Load from URL on initial render
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      try {
+        const decoded = atob(hash);
+        const data = JSON.parse(decoded);
+        if (data.playerConfigs && data.selectedFormationNames) {
+          setPlayerConfigs(data.playerConfigs);
+          setSelectedFormationNames(data.selectedFormationNames);
+          toast({ title: "Shared formation loaded!", description: "The formation from the link has been loaded." });
+          // Clear the hash
+          window.history.pushState("", document.title, window.location.pathname + window.location.search);
+        }
+      } catch (e) {
+        console.error("Failed to load formation from URL hash", e);
+        toast({ title: "Error", description: "Could not load the shared formation from the link.", variant: "destructive" });
+      }
+    }
+  }, [toast]);
   
   const players = playerConfigs[playerCount][playPhase];
   const setPlayers = (newPlayers: Player[] | ((prevPlayers: Player[]) => Player[])) => {
@@ -91,56 +129,25 @@ export default function FormationEditor() {
   }
 
   const handleResetFormation = () => {
-    let initialPlayers: Player[];
-    let initialFormationName: string;
-    let baseFormations: Formation[];
+    const initialPlayers = initialPlayerConfigs[playerCount][playPhase];
+    const initialFormationName = initialFormationNames[playerCount][playPhase];
 
-    if (playerCount === '6') {
-      baseFormations = formations6;
-      initialFormationName = baseFormations[0].name;
-    } else if (playerCount === '7') {
-      baseFormations = formations7;
-      initialFormationName = baseFormations[0].name;
-    } else {
-      baseFormations = formations11;
-      initialFormationName = baseFormations[1].name;
-    }
-
-    const formation = baseFormations.find(f => f.name === initialFormationName);
-    if (!formation) return;
-    initialPlayers = formation.players;
-
-    setPlayers(prev => {
-      const prevActive = prev.filter(p => !p.isBenched);
-      const prevBenched = prev.filter(p => p.isBenched);
-
-      // Map old active players to new default positions, keeping their names
-      const newActive = initialPlayers.map((initialPlayer, index) => {
-        const existingPlayer = prevActive[index];
-        return {
-          ...initialPlayer,
-          id: existingPlayer?.id || initialPlayer.id, // Keep original ID if possible
-          name: existingPlayer?.name || initialPlayer.name,
-        };
-      });
-
-      // Keep benched players, but adjust if the number of subs changes
-      const totalPlayersInFormation = parseInt(playerCount, 10);
-      const subCount = players.length - totalPlayersInFormation;
-      
-      let updatedBenched = [...prevBenched];
-      if (updatedBenched.length > subCount && subCount >= 0) {
-        updatedBenched = updatedBenched.slice(0, subCount);
-      } else {
-        for (let i = updatedBenched.length; i < subCount; i++) {
-          updatedBenched.push({ id: `s_new_${Date.now()}_${i}`, name: `Sub ${i + 1}`, position: { x: 0, y: 0 }, isBenched: true });
-        }
+    setPlayerConfigs(prev => ({
+      ...prev,
+      [playerCount]: {
+        ...prev[playerCount],
+        [playPhase]: JSON.parse(JSON.stringify(initialPlayers)) // deep copy
       }
+    }));
+    
+    setSelectedFormationNames(prev => ({
+      ...prev,
+      [playerCount]: {
+        ...prev[playerCount],
+        [playPhase]: initialFormationName
+      }
+    }));
 
-      return [...newActive, ...updatedBenched];
-    });
-
-    setSelectedFormationName(initialFormationName);
     toast({ title: "Formation Reset", description: `The ${playPhase} formation has been reset to the default.` });
   };
   
@@ -243,7 +250,6 @@ export default function FormationEditor() {
         try {
           const data = JSON.parse(event.target?.result as string);
           if (data.playerConfigs) {
-            // Basic validation
             const importedConfigs = data.playerConfigs;
             if (importedConfigs['11'] && importedConfigs['7'] && importedConfigs['6'] &&
                 importedConfigs['11'].attacking && importedConfigs['11'].defending) {
@@ -253,21 +259,6 @@ export default function FormationEditor() {
             } else {
                throw new Error("Invalid file format");
             }
-          } else if (data.playerCount && data.players) { // Legacy import for backward compatibility
-             const importedCount = data.playerCount.toString() as PlayerCount;
-             const importedPlayers = data.players.map((p: Player) => ({ ...p, isBenched: p.isBenched || false }));
-             
-             setPlayerConfigs(prev => ({
-                ...prev,
-                [importedCount]: {
-                  attacking: importedPlayers,
-                  defending: JSON.parse(JSON.stringify(importedPlayers)) // deep copy
-                }
-             }));
-             setPlayerCount(importedCount);
-             setSelectedFormationName("Custom");
-             toast({ title: "Success", description: "Legacy formation imported successfully." });
-
           } else {
             throw new Error("Invalid file format");
           }
@@ -300,7 +291,6 @@ export default function FormationEditor() {
 
   const handleTouchEndOnPlayer = (e: TouchEvent, targetPlayerId: string) => {
     if (draggedPlayerId && draggedPlayerId !== targetPlayerId) {
-        // Find the element that was touched
         const touch = e.changedTouches[0];
         const endTarget = document.elementFromPoint(touch.clientX, touch.clientY);
         const endPlayerId = endTarget?.closest('[data-player-id]')?.getAttribute('data-player-id');
@@ -323,11 +313,9 @@ export default function FormationEditor() {
         const sourcePlayer = newPlayers[sourceIndex];
         const targetPlayer = newPlayers[targetIndex];
 
-        // Swap positions in the array to reorder in lists
         newPlayers[sourceIndex] = targetPlayer;
         newPlayers[targetIndex] = sourcePlayer;
 
-        // If one is on the bench and one is not, swap their 'isBenched' status
         if (sourcePlayer.isBenched !== targetPlayer.isBenched) {
             newPlayers[sourceIndex] = { ...targetPlayer, isBenched: sourcePlayer.isBenched, position: sourcePlayer.position };
             newPlayers[targetIndex] = { ...sourcePlayer, isBenched: targetPlayer.isBenched, position: targetPlayer.position };
@@ -339,6 +327,53 @@ export default function FormationEditor() {
     if(!players.find(p => p.id === sourceId)?.isBenched || !players.find(p => p.id === targetId)?.isBenched){
       setSelectedFormationName("Custom");
     }
+  };
+
+  const handleSaveSetup = (e: FormEvent) => {
+    e.preventDefault();
+    if (!newSetupName) return;
+
+    const newSavedSetups = {
+      ...savedSetups,
+      [newSetupName]: { playerConfigs, selectedFormationNames }
+    };
+    setSavedSetups(newSavedSetups);
+    toast({ title: "Setup Saved", description: `"${newSetupName}" has been saved.` });
+    setSaveDialogOpen(false);
+    setNewSetupName('');
+  };
+
+  const handleLoadSetup = (name: string) => {
+    const setup = savedSetups[name];
+    if (setup) {
+      setPlayerConfigs(setup.playerConfigs);
+      setSelectedFormationNames(setup.selectedFormationNames);
+      toast({ title: "Setup Loaded", description: `"${name}" has been loaded.` });
+    }
+  };
+
+  const handleDeleteSetup = (name: string) => {
+    const newSavedSetups = { ...savedSetups };
+    delete newSavedSetups[name];
+    setSavedSetups(newSavedSetups);
+    toast({ title: "Setup Deleted", description: `"${name}" has been deleted.`, variant: "destructive" });
+  };
+
+  const handleGenerateShareLink = () => {
+    const data: FormationSetup = { playerConfigs, selectedFormationNames };
+    const jsonString = JSON.stringify(data);
+    const encoded = btoa(jsonString);
+    const link = `${window.location.origin}${window.location.pathname}#${encoded}`;
+    setShareableLink(link);
+    setShareDialogOpen(true);
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareableLink).then(() => {
+      toast({ title: "Copied!", description: "The shareable link has been copied to your clipboard." });
+    }, () => {
+      toast({ title: "Error", description: "Failed to copy the link.", variant: "destructive" });
+    });
   };
 
   let currentFormations: Formation[];
@@ -382,6 +417,12 @@ export default function FormationEditor() {
     </li>
   );
 
+  const previousPlayerConfig = useRef<Player[]>();
+  useEffect(() => {
+    previousPlayerConfig.current = players;
+  }, [players]);
+
+
   return (
     <TooltipProvider>
       <div className="flex flex-col md:flex-row h-screen bg-background text-foreground overflow-hidden">
@@ -392,14 +433,22 @@ export default function FormationEditor() {
                 <Logo className="h-8 w-8 text-primary" />
                 <h1 className="text-xl font-bold">Footy Formation</h1>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={handleGenerateShareLink}>
+                      <Share2 className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Share Formation</p></TooltipContent>
+                </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={handleImportClick}>
                       <Upload className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent><p>Import Formation</p></TooltipContent>
+                  <TooltipContent><p>Import File</p></TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -407,13 +456,46 @@ export default function FormationEditor() {
                       <Download className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent><p>Export Formation</p></TooltipContent>
+                  <TooltipContent><p>Export to File</p></TooltipContent>
                 </Tooltip>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".txt,application/json" className="hidden" />
               </div>
             </header>
 
             <div className="p-4 space-y-4">
+              <div className='flex items-end gap-2'>
+                <div className='flex-1'>
+                  <Label className="text-sm font-medium mb-2 block">Saved Setups</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between">
+                        <span>{Object.keys(savedSetups).length > 0 ? "Load Setup" : "No Setups"}</span> <Users className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-64">
+                      <DropdownMenuLabel>Load a Saved Setup</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {Object.keys(savedSetups).length > 0 ? Object.keys(savedSetups).map(name => (
+                         <DropdownMenuItem key={name} onSelect={() => handleLoadSetup(name)} className="flex justify-between items-center">
+                          <span>{name}</span>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteSetup(name);}}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                         </DropdownMenuItem>
+                      )) : <DropdownMenuItem disabled>No saved setups found.</DropdownMenuItem>}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                 <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" onClick={() => setSaveDialogOpen(true)}>
+                      <Save className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Save Current Setup</p></TooltipContent>
+                </Tooltip>
+              </div>
+
               <div>
                 <Label className="text-sm font-medium mb-2 block">Game Type</Label>
                 <Tabs value={playerCount} onValueChange={handlePlayerCountChange}>
@@ -513,7 +595,8 @@ export default function FormationEditor() {
             </div>
             <div className="flex-1">
                 <FormationCanvas 
-                    players={activePlayers} 
+                    players={activePlayers}
+                    previousPlayers={previousPlayerConfig.current?.filter(p => !p.isBenched) || []}
                     onPlayerPositionChange={handlePlayerPositionChange}
                     onPlayerDrop={handleDropOnPlayer}
                 />
@@ -538,6 +621,41 @@ export default function FormationEditor() {
             </form>
           </DialogContent>
         </Dialog>
+        
+        <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Save Setup</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSaveSetup}>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="setup-name" className="text-right">Name</Label>
+                  <Input id="setup-name" value={newSetupName} onChange={(e) => setNewSetupName(e.target.value)} className="col-span-3" placeholder="e.g., Weekend League Squad" autoFocus />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit">Save</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share Your Formation</DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center space-x-2 mt-4">
+              <Input value={shareableLink} readOnly />
+              <Button type="button" size="icon" onClick={handleCopyLink}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">Anyone with the link will be able to view your formation.</p>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </TooltipProvider>
   );
