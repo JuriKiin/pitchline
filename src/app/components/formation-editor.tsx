@@ -74,7 +74,7 @@ export default function FormationEditor() {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [editName, setEditName] = useState('');
   const [editPositionName, setEditPositionName] = useState('');
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
+  const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -297,32 +297,37 @@ export default function FormationEditor() {
     if (e.target) e.target.value = '';
   };
 
-  const handleDragStart = (e: DragEvent, playerId: string) => {
-    e.dataTransfer.setData("playerId", playerId);
-    setDraggedPlayerId(playerId);
+  // Drag and Drop Logic
+  const handleDragStart = (e: DragEvent, player: Player) => {
+    e.dataTransfer.setData("playerId", player.id);
+    setDraggedPlayer(player);
+  };
+
+  const handleTouchStart = (player: Player) => {
+    setDraggedPlayer(player);
   };
 
   const handleDragEnd = () => {
-    setDraggedPlayerId(null);
+    setDraggedPlayer(null);
     setIsDraggingOverBench(false);
   };
   
   const handlePlayerSwap = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+
     setPlayers(prev => {
         const sourceIndex = prev.findIndex(p => p.id === sourceId);
         const targetIndex = prev.findIndex(p => p.id === targetId);
 
         if (sourceIndex === -1 || targetIndex === -1) return prev;
-
+        
         const newPlayers = [...prev];
-        const sourcePlayer = { ...newPlayers[sourceIndex] };
-        const targetPlayer = { ...newPlayers[targetIndex] };
+        const sourcePlayer = newPlayers[sourceIndex];
+        const targetPlayer = newPlayers[targetIndex];
 
-        // Swap their core properties
-        newPlayers[sourceIndex].name = targetPlayer.name;
-        newPlayers[sourceIndex].positionName = targetPlayer.positionName;
-        newPlayers[targetIndex].name = sourcePlayer.name;
-        newPlayers[targetIndex].positionName = sourcePlayer.positionName;
+        // The simple swap of all properties.
+        newPlayers[sourceIndex] = { ...targetPlayer, id: sourcePlayer.id };
+        newPlayers[targetIndex] = { ...sourcePlayer, id: targetPlayer.id };
 
         return newPlayers;
     });
@@ -339,7 +344,6 @@ export default function FormationEditor() {
     if (sourcePlayerId && targetPlayerId && sourcePlayerId !== targetPlayerId) {
         handlePlayerSwap(sourcePlayerId, targetPlayerId);
     } else if (sourcePlayerId && !targetPlayerId) {
-        // This case handles dropping a player onto the bench area
         const targetIsBench = (e.target as HTMLElement).closest('[data-bench-dropzone="true"]');
         if (targetIsBench) {
             setPlayers(prev => prev.map(p => p.id === sourcePlayerId ? { ...p, isBenched: true } : p));
@@ -347,7 +351,31 @@ export default function FormationEditor() {
         }
     }
     setIsDraggingOverBench(false);
+    setDraggedPlayer(null);
   };
+
+  const handleTouchDrop = (e: TouchEvent, targetPlayerId?: string) => {
+    e.preventDefault();
+    if (!draggedPlayer) return;
+
+    const sourcePlayerId = draggedPlayer.id;
+
+    if (targetPlayerId && sourcePlayerId !== targetPlayerId) {
+        handlePlayerSwap(sourcePlayerId, targetPlayerId);
+    } else if (!targetPlayerId) {
+        const touch = e.changedTouches[0];
+        const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetIsBench = targetElement?.closest('[data-bench-dropzone="true"]');
+
+        if (targetIsBench) {
+            setPlayers(prev => prev.map(p => p.id === sourcePlayerId ? { ...p, isBenched: true } : p));
+            setSelectedFormationName("Custom");
+        }
+    }
+    setIsDraggingOverBench(false);
+    setDraggedPlayer(null);
+  };
+
 
   const handleSaveSetup = (e: FormEvent) => {
     e.preventDefault();
@@ -412,12 +440,17 @@ export default function FormationEditor() {
   const PlayerListItem = ({ player }: { player: Player }) => (
     <li
       data-player-id={player.id}
-      className="flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 cursor-grab"
+      className={cn(
+          "flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 cursor-grab",
+          draggedPlayer?.id === player.id && "opacity-50"
+      )}
       draggable
-      onDragStart={(e) => handleDragStart(e, player.id)}
+      onDragStart={(e) => handleDragStart(e, player)}
       onDragEnd={handleDragEnd}
       onDrop={(e) => handleDropOnPlayer(e, player.id)}
       onDragOver={(e) => e.preventDefault()}
+      onTouchStart={() => handleTouchStart(player)}
+      onTouchEnd={(e) => handleTouchDrop(e, player.id)}
     >
       <span className="flex-1 font-medium truncate">{player.name}</span>
       <span className="text-xs text-muted-foreground w-8 text-center">{player.positionName}</span>
@@ -585,6 +618,7 @@ export default function FormationEditor() {
                       onDragOver={(e) => e.preventDefault()}
                       onDragEnter={() => setIsDraggingOverBench(true)}
                       onDragLeave={() => setIsDraggingOverBench(false)}
+                      onTouchEnd={(e) => handleTouchDrop(e)}
                     >
                       <CardHeader className="pt-4 pb-2">
                         <CardTitle className="text-lg flex items-center gap-2">
@@ -644,6 +678,9 @@ export default function FormationEditor() {
                         previousPlayers={previousPlayerConfig.current?.filter(p => !p.isBenched) || []}
                         onPlayerPositionChange={handlePlayerPositionChange}
                         onPlayerDrop={handleDropOnPlayer}
+                        onTouchDrop={handleTouchDrop}
+                        onTouchStart={handleTouchStart}
+                        draggedPlayer={draggedPlayer}
                     />
                 </div>
             </main>

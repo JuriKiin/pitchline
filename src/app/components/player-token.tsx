@@ -1,6 +1,6 @@
 'use client';
 
-import { DragEvent, useEffect, useRef } from 'react';
+import { DragEvent, useEffect, useRef, TouchEvent } from 'react';
 import type { Player } from '@/app/lib/types';
 import { cn } from '@/lib/utils';
 import { User } from 'lucide-react';
@@ -12,9 +12,10 @@ interface PlayerTokenProps {
   onTouchStart: () => void;
   isDragged: boolean;
   onDrop: (e: DragEvent) => void;
+  onTouchEnd: (e: TouchEvent) => void;
 }
 
-export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchStart, isDragged, onDrop }: PlayerTokenProps) {
+export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchStart, isDragged, onDrop, onTouchEnd }: PlayerTokenProps) {
   const tokenRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,6 +72,7 @@ export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchS
       }}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       title={player.name}
       draggable
       onDragStart={handleDragStart}

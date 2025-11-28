@@ -9,12 +9,22 @@ interface FormationCanvasProps {
   previousPlayers: Player[];
   onPlayerPositionChange: (id: string, position: { x: number; y: number }) => void;
   onPlayerDrop: (e: DragEvent, targetPlayerId?: string) => void;
+  onTouchDrop: (e: TouchEvent, targetPlayerId?: string) => void;
+  onTouchStart: (player: Player) => void;
+  draggedPlayer: Player | null;
 }
 
-export default function FormationCanvas({ players, previousPlayers, onPlayerPositionChange, onPlayerDrop }: FormationCanvasProps) {
+export default function FormationCanvas({ 
+  players, 
+  previousPlayers, 
+  onPlayerPositionChange, 
+  onPlayerDrop,
+  onTouchDrop,
+  onTouchStart,
+  draggedPlayer
+}: FormationCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);
-
+  
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!draggedPlayer || !canvasRef.current) return;
 
@@ -51,22 +61,6 @@ export default function FormationCanvas({ players, previousPlayers, onPlayerPosi
     }
   };
 
-  const handleMouseUp = () => {
-    setDraggedPlayer(null);
-  };
-
-  const handleTouchEnd = () => {
-    setDraggedPlayer(null);
-  };
-  
-  const handleMouseDown = (player: Player) => {
-    setDraggedPlayer(player);
-  };
-
-  const handleTouchStart = (player: Player) => {
-    setDraggedPlayer(player);
-  };
-
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
   };
@@ -99,10 +93,10 @@ export default function FormationCanvas({ players, previousPlayers, onPlayerPosi
       className="relative w-full h-full bg-accent/30 dark:bg-accent/20 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none"
       ref={canvasRef}
       onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseUp={() => onTouchStart(null!)}
+      onMouseLeave={() => onTouchStart(null!)}
       onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchEnd={(e) => onTouchDrop(e)}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       data-canvas-dropzone="true"
@@ -123,10 +117,11 @@ export default function FormationCanvas({ players, previousPlayers, onPlayerPosi
             key={player.id}
             player={player}
             oldPosition={oldPosition}
-            onMouseDown={() => handleMouseDown(player)}
-            onTouchStart={() => handleTouchStart(player)}
+            onMouseDown={() => onTouchStart(player)}
+            onTouchStart={() => onTouchStart(player)}
             isDragged={draggedPlayer?.id === player.id}
             onDrop={(e) => onPlayerDrop(e, player.id)}
+            onTouchEnd={(e) => onTouchDrop(e, player.id)}
           />
         )
       })}
