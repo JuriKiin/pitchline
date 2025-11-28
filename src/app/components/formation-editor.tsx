@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -88,6 +88,45 @@ export default function FormationEditor() {
   const handlePhaseChange = (value: string) => {
     setPlayPhase(value as PlayPhase);
   }
+
+  const handleResetFormation = () => {
+    let initialPlayers: Player[];
+    let initialFormationName: string;
+    if (playerCount === '6') {
+      initialPlayers = initialPlayers6;
+      initialFormationName = formations6[0].name;
+    } else if (playerCount === '7') {
+      initialPlayers = initialPlayers7;
+      initialFormationName = formations7[0].name;
+    } else {
+      initialPlayers = initialPlayers11;
+      initialFormationName = formations11[1].name;
+    }
+    
+    // Preserve existing players and their names, but reset positions
+    setPlayers(prev => {
+      const activeInitial = initialPlayers.filter(p => !p.isBenched);
+      const benchedInitial = initialPlayers.filter(p => p.isBenched);
+      const prevActive = prev.filter(p => !p.isBenched);
+      const prevBenched = prev.filter(p => p.isBenched);
+
+      // Map old players to new default positions
+      const newActive = activeInitial.map((initialPlayer, index) => {
+        const existingPlayer = prevActive[index];
+        return {
+          ...initialPlayer,
+          id: existingPlayer?.id || initialPlayer.id,
+          name: existingPlayer?.name || initialPlayer.name,
+        };
+      });
+
+      // Keep benched players as they were
+      return [...newActive, ...prevBenched];
+    });
+
+    setSelectedFormationName(initialFormationName);
+    toast({ title: "Formation Reset", description: `The ${playPhase} formation has been reset to the default.` });
+  };
   
   const handleFormationChange = (formationName: string) => {
     let formations: Formation[];
@@ -408,12 +447,22 @@ export default function FormationEditor() {
         </aside>
 
         <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/30 dark:bg-card/20">
-            <Tabs value={playPhase} onValueChange={handlePhaseChange} className="w-full mb-4">
-                <TabsList className="grid w-full grid-cols-2 max-w-sm mx-auto">
-                    <TabsTrigger value="attacking">Attacking</TabsTrigger>
-                    <TabsTrigger value="defending">Defending</TabsTrigger>
-                </TabsList>
-            </Tabs>
+            <div className="flex justify-center items-center mb-4 gap-4">
+              <Tabs value={playPhase} onValueChange={handlePhaseChange} className="w-full max-w-sm">
+                  <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="attacking">Attacking</TabsTrigger>
+                      <TabsTrigger value="defending">Defending</TabsTrigger>
+                  </TabsList>
+              </Tabs>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={handleResetFormation}>
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Reset Formation</p></TooltipContent>
+              </Tooltip>
+            </div>
             <div className="flex-1">
                 <FormationCanvas 
                     players={activePlayers} 
@@ -445,5 +494,3 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
-
-    
