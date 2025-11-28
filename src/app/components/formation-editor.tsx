@@ -449,12 +449,16 @@ export default function FormationEditor() {
   };
 
   const handleExportImage = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      html2canvas(canvas, {
-        backgroundColor: null, // Use transparent background
+    const canvasElement = canvasRef.current;
+    if (canvasElement) {
+      const computedStyle = getComputedStyle(canvasElement);
+      const backgroundColor = computedStyle.backgroundColor;
+      
+      html2canvas(canvasElement, {
+        backgroundColor: backgroundColor,
         logging: false,
         useCORS: true,
+        scale: 2 // Increase scale for better resolution
       }).then(canvas => {
         const image = canvas.toDataURL('image/png');
         const link = document.createElement('a');
@@ -821,3 +825,5 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
+
+    
