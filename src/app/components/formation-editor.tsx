@@ -82,7 +82,7 @@ export default function FormationEditor() {
     if (hash) {
       try {
         const decoded = atob(hash);
-        const data: SharedFormation = JSON.parse(decoded);
+        const data: SharedFormation | any = JSON.parse(decoded);
         if (data.playerCount && data.config && data.formationNames) {
           setPlayerCount(data.playerCount);
           setPlayerConfigs(prev => ({
@@ -95,7 +95,7 @@ export default function FormationEditor() {
           }));
           toast({ title: "Shared formation loaded!", description: `The ${data.playerCount}-a-side formation has been loaded.` });
           window.history.pushState("", document.title, window.location.pathname + window.location.search);
-        } else if (data.playerConfigs && data.selectedFormationNames) { // Legacy link support
+        } else if (data.playerConfigs && data.selectedFormationNames) { // Legacy link support for full setup
           setPlayerConfigs(data.playerConfigs);
           setSelectedFormationNames(data.selectedFormationNames);
           toast({ title: "Shared formation loaded!", description: "The formation from the link has been loaded." });
