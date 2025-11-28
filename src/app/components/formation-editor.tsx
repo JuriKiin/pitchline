@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -73,6 +73,7 @@ export default function FormationEditor() {
 
   const [savedSetups, setSavedSetups] = useLocalStorage<Record<string, FormationSetup>>('footy-formation-setups', {});
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
   const [newSetupName, setNewSetupName] = useState('');
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareableLink, setShareableLink] = useState('');
@@ -248,10 +249,12 @@ export default function FormationEditor() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setImportExportDialogOpen(false);
   };
   
   const handleImportClick = () => {
     fileInputRef.current?.click();
+    setImportExportDialogOpen(false);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -447,7 +450,7 @@ export default function FormationEditor() {
              <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Logo className="h-8 w-8 text-primary" />
-                <h1 className="text-xl font-bold">Footy Formation</h1>
+                <h1 className="text-xl font-bold">Footy</h1>
               </div>
               <div className="flex items-center gap-1">
                 <Tooltip>
@@ -460,19 +463,11 @@ export default function FormationEditor() {
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleImportClick}>
-                      <Upload className="h-5 w-5" />
+                    <Button variant="ghost" size="icon" onClick={() => setImportExportDialogOpen(true)}>
+                      <FileArchive className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent><p>Import File</p></TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleExport}>
-                      <Download className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Export to File</p></TooltipContent>
+                  <TooltipContent><p>Manage Files</p></TooltipContent>
                 </Tooltip>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".txt,application/json" className="hidden" />
               </div>
@@ -517,9 +512,9 @@ export default function FormationEditor() {
                 <Label className="text-sm font-medium mb-2 block">Game Type</Label>
                 <Tabs value={playerCount} onValueChange={handlePlayerCountChange}>
                   <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="11">11-a-side</TabsTrigger>
-                    <TabsTrigger value="7">7-a-side</TabsTrigger>
-                    <TabsTrigger value="6">6-a-side</TabsTrigger>
+                    <TabsTrigger value="11">11v11</TabsTrigger>
+                    <TabsTrigger value="7">7v7</TabsTrigger>
+                    <TabsTrigger value="6">6v6</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -676,6 +671,24 @@ export default function FormationEditor() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground mt-2">Anyone with the link will be able to view your formation.</p>
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog open={importExportDialogOpen} onOpenChange={setImportExportDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Manage Files</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+               <Button variant="outline" onClick={handleImportClick}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import from File
+              </Button>
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export to File
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
 
