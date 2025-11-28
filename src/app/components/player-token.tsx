@@ -7,49 +7,37 @@ import { User } from 'lucide-react';
 
 interface PlayerTokenProps {
   player: Player;
-  onInteractionStart: (player: Player) => void;
+  onMouseDown: () => void;
+  onTouchStart: () => void;
   isDragged: boolean;
   onDrop: (e: DragEvent) => void;
-  isSwapTarget: boolean;
-  isSwapSource: boolean;
 }
 
-export default function PlayerToken({ player, onInteractionStart, isDragged, onDrop, isSwapTarget, isSwapSource }: PlayerTokenProps) {
+export default function PlayerToken({ player, onMouseDown, onTouchStart, isDragged, onDrop }: PlayerTokenProps) {
   
   const handleDragStart = (e: DragEvent) => {
-    // Only allow drag for non-touch devices to avoid conflicts
-    if (e.pointerType !== 'touch') {
-      e.dataTransfer.setData("playerId", player.id);
-    }
+    e.dataTransfer.setData("playerId", player.id);
   };
   
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
   };
 
-  const handleClick = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    onInteractionStart(player);
-  };
-
   return (
     <div
       key={player.id}
       className={cn(
-        'absolute w-16 h-16 rounded-full bg-primary text-primary-foreground flex flex-col items-center justify-center text-center p-1 shadow-lg select-none transition-all duration-200 ease-in-out',
-        isDragged ? 'cursor-grabbing shadow-2xl scale-110 z-10' : 'cursor-grab',
-        isSwapSource && 'ring-4 ring-primary ring-offset-2 ring-offset-background',
-        isSwapTarget && 'cursor-pointer ring-2 ring-dashed ring-primary/70 animate-pulse',
-        !isSwapSource && !isSwapTarget && 'cursor-grab'
+        'absolute w-16 h-16 rounded-full bg-primary text-primary-foreground flex flex-col items-center justify-center text-center p-1 shadow-lg cursor-grab select-none',
+        isDragged && 'cursor-grabbing shadow-2xl scale-110 z-10'
       )}
       style={{
         left: `calc(${player.position.x}% - 2rem)`,
         top: `calc(${player.position.y}% - 2rem)`,
       }}
-      onMouseDown={handleClick}
-      onTouchStart={handleClick}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
       title={player.name}
-      draggable={!isSwapSource && !isSwapTarget}
+      draggable
       onDragStart={handleDragStart}
       onDrop={onDrop}
       onDragOver={handleDragOver}

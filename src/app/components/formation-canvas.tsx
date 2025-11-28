@@ -8,20 +8,18 @@ interface FormationCanvasProps {
   players: Player[];
   onPlayerPositionChange: (id: string, position: { x: number; y: number }) => void;
   onPlayerDrop: (e: DragEvent, targetPlayerId: string) => void;
-  onPlayerClick: (id: string) => void;
-  swapPlayerId: string | null;
 }
 
-export default function FormationCanvas({ players, onPlayerPositionChange, onPlayerDrop, onPlayerClick, swapPlayerId }: FormationCanvasProps) {
+export default function FormationCanvas({ players, onPlayerPositionChange, onPlayerDrop }: FormationCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
+  const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);
 
-  const updatePlayerPosition = (clientX: number, clientY: number) => {
-    if (!draggedPlayerId || !canvasRef.current) return;
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!draggedPlayer || !canvasRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
     const tokenHalfWidth = 32; // Corresponds to w-16 -> 4rem -> 64px, half is 32px
     const clampedX = Math.max(tokenHalfWidth, Math.min(x, rect.width - tokenHalfWidth));
@@ -30,32 +28,42 @@ export default function FormationCanvas({ players, onPlayerPositionChange, onPla
     const newXPercent = (clampedX / rect.width) * 100;
     const newYPercent = (clampedY / rect.height) * 100;
 
-    onPlayerPositionChange(draggedPlayerId, { x: newXPercent, y: newYPercent });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!draggedPlayerId) return;
-    updatePlayerPosition(e.clientX, e.clientY);
+    onPlayerPositionChange(draggedPlayer.id, { x: newXPercent, y: newYPercent });
   };
 
   const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
-    if (!draggedPlayerId) return;
+    if (!draggedPlayer || !canvasRef.current) return;
     const touch = e.touches[0];
     if (touch) {
-      updatePlayerPosition(touch.clientX, touch.clientY);
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+
+      const tokenHalfWidth = 32;
+      const clampedX = Math.max(tokenHalfWidth, Math.min(x, rect.width - tokenHalfWidth));
+      const clampedY = Math.max(tokenHalfWidth, Math.min(y, rect.height - tokenHalfWidth));
+
+      const newXPercent = (clampedX / rect.width) * 100;
+      const newYPercent = (clampedY / rect.height) * 100;
+
+      onPlayerPositionChange(draggedPlayer.id, { x: newXPercent, y: newYPercent });
     }
   };
 
-  const handleInteractionEnd = () => {
-    setDraggedPlayerId(null);
+  const handleMouseUp = () => {
+    setDraggedPlayer(null);
+  };
+
+  const handleTouchEnd = () => {
+    setDraggedPlayer(null);
   };
   
-  const handleInteractionStart = (player: Player) => {
-    if (swapPlayerId) {
-      onPlayerClick(player.id);
-      return;
-    }
-    setDraggedPlayerId(player.id);
+  const handleMouseDown = (player: Player) => {
+    setDraggedPlayer(player);
+  };
+
+  const handleTouchStart = (player: Player) => {
+    setDraggedPlayer(player);
   };
 
   const handleDragOver = (e: DragEvent) => {
@@ -82,10 +90,10 @@ export default function FormationCanvas({ players, onPlayerPositionChange, onPla
     <div className="relative w-full h-full bg-accent/30 dark:bg-accent/20 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none"
       ref={canvasRef}
       onMouseMove={handleMouseMove}
-      onMouseUp={handleInteractionEnd}
-      onMouseLeave={handleInteractionEnd}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
       onTouchMove={handleTouchMove}
-      onTouchEnd={handleInteractionEnd}
+      onTouchEnd={handleTouchEnd}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -100,11 +108,10 @@ export default function FormationCanvas({ players, onPlayerPositionChange, onPla
         <PlayerToken
           key={player.id}
           player={player}
-          onInteractionStart={handleInteractionStart}
-          isDragged={draggedPlayerId === player.id}
+          onMouseDown={() => handleMouseDown(player)}
+          onTouchStart={() => handleTouchStart(player)}
+          isDragged={draggedPlayer?.id === player.id}
           onDrop={(e) => onPlayerDrop(e, player.id)}
-          isSwapTarget={!!swapPlayerId && swapPlayerId !== player.id}
-          isSwapSource={swapPlayerId === player.id}
         />
       ))}
     </div>
