@@ -451,17 +451,30 @@ export default function FormationEditor() {
   const handleExportImage = () => {
     const canvasElement = canvasRef.current;
     if (canvasElement) {
-      html2canvas(canvasElement, {
-        backgroundColor: '#1A202C', // Dark background
+      // Create a temporary wrapper to add padding
+      const wrapper = document.createElement('div');
+      wrapper.style.padding = '2rem';
+      wrapper.style.backgroundColor = '#1A202C';
+      
+      // Clone the element to avoid moving the original
+      const clonedElement = canvasElement.cloneNode(true) as HTMLElement;
+      wrapper.appendChild(clonedElement);
+      document.body.appendChild(wrapper);
+
+      html2canvas(wrapper, {
+        backgroundColor: '#1A202C',
         logging: false,
         useCORS: true,
-        scale: 2 // Increase scale for better resolution
+        scale: 2 
       }).then(canvas => {
         const image = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = 'pitchline-formation.png';
         link.href = image;
         link.click();
+        
+        // Clean up the temporary wrapper
+        document.body.removeChild(wrapper);
       });
     }
   };
