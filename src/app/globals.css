@@ -56,3 +56,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  [data-field-pattern="stripes-vertical"] {
+    background-image: repeating-linear-gradient(90deg, 
+      transparent, 
+      transparent 10%, 
+      rgba(255,255,255,0.05) 10%, 
+      rgba(255,255,255,0.05) 20%
+    );
+  }
+}

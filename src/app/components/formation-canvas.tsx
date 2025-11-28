@@ -3,7 +3,9 @@
 import { DragEvent, useRef, useState, TouchEvent, forwardRef } from 'react';
 import type { Player } from '@/app/lib/types';
 import PlayerToken from './player-token';
+import { cn } from '@/lib/utils';
 
+type FieldPattern = 'none' | 'stripes-vertical' | 'stripes-horizontal' | 'diamonds-light' | 'diamonds-dark' | 'checkerboard';
 interface FormationCanvasProps {
   players: Player[];
   previousPlayers: Player[];
@@ -12,6 +14,7 @@ interface FormationCanvasProps {
   onTouchDrop: (e: TouchEvent, targetPlayerId?: string) => void;
   onTouchStart: (player: Player) => void;
   draggedPlayer: Player | null;
+  fieldPattern: FieldPattern;
 }
 
 const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({ 
@@ -21,7 +24,8 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
   onPlayerDrop,
   onTouchDrop,
   onTouchStart,
-  draggedPlayer
+  draggedPlayer,
+  fieldPattern = 'stripes-vertical'
 }, ref) => {
   
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -66,7 +70,10 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
 
   return (
     <div 
-      className="relative w-full h-full bg-accent/30 dark:bg-accent/20 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none"
+      className={cn(
+        "relative w-full h-full bg-accent dark:bg-accent/80 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none",
+        "bg-cover bg-center"
+      )}
       ref={ref}
       onMouseMove={handleMouseMove}
       onMouseUp={() => onTouchStart(null!)}
@@ -76,6 +83,7 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
       onDragOver={handleDragOver}
       onDrop={onPlayerDrop}
       data-canvas-dropzone="true"
+      data-field-pattern={fieldPattern}
     >
       {/* Field Markings */}
       <div className="absolute top-1/2 left-0 w-full h-px bg-white/30 -translate-y-1/2 pointer-events-none" />

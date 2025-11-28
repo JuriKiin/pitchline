@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useRef, ChangeEvent, FormEvent, DragEvent, TouchEvent, useEffect } from 'react';
+import { useState, useRef, ChangeEvent, FormEvent, DragEvent, TouchEvent, useEffect, useCallback } from 'react';
 import { initialPlayers6, initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
 import type { Player } from '@/app/lib/types';
 import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User, ImageDown, Palette } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User, ImageDown } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -24,7 +25,7 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarProvider, 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
-import { Slider } from '@/components/ui/slider';
+import React from 'react';
 
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -43,26 +44,12 @@ interface PlayerConfigs {
 interface FormationSetup {
   playerConfigs: PlayerConfigs;
   selectedFormationNames: Record<PlayerCount, Record<PlayPhase, string>>;
-  theme?: {
-    primary: HSL;
-    accent: HSL;
-  };
 }
 
 interface SharedFormation {
   playerCount: PlayerCount;
   config: PhasePlayers;
   formationNames: Record<PlayPhase, string>;
-  theme?: {
-    primary: HSL;
-    accent: HSL;
-  };
-}
-
-interface HSL {
-  h: number;
-  s: number;
-  l: number;
 }
 
 const initialFormationNames = {
@@ -83,8 +70,98 @@ const positionOptions = [
   "LW", "RW", "ST", "CF", "SUB"
 ];
 
+const SavedSetupMenuItem = React.memo(({ name, onLoad, onDelete }: { name: string; onLoad: (name: string) => void; onDelete: (name: string) => void; }) => {
+  const handleDeleteClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(name);
+  }, [onDelete, name]);
+
+  const handleSelect = useCallback(() => {
+    onLoad(name);
+  }, [onLoad, name]);
+
+  return (
+    <DropdownMenuItem onSelect={handleSelect} className="flex justify-between items-center">
+      <span>{name}</span>
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive" onClick={handleDeleteClick}>
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </DropdownMenuItem>
+  );
+});
+SavedSetupMenuItem.displayName = 'SavedSetupMenuItem';
+
+const PlayerListItem = React.memo(({ 
+    player, 
+    draggedPlayer, 
+    handleDragStart, 
+    handleDragEnd, 
+    handleDrop, 
+    handleTouchStart, 
+    handleTouchDrop, 
+    onStartEdit, 
+    onRemove 
+}: { 
+    player: Player;
+    draggedPlayer: Player | null;
+    handleDragStart: (e: DragEvent, player: Player) => void;
+    handleDragEnd: () => void;
+    handleDrop: (e: DragEvent, playerId: string) => void;
+    handleTouchStart: (player: Player) => void;
+    handleTouchDrop: (e: TouchEvent, playerId: string) => void;
+    onStartEdit: (player: Player) => void;
+    onRemove: (id: string) => void;
+}) => {
+    
+    const onEditClick = useCallback(() => {
+        onStartEdit(player);
+    }, [onStartEdit, player]);
+
+    const onRemoveClick = useCallback(() => {
+        onRemove(player.id);
+    }, [onRemove, player.id]);
+
+    return (
+        <li
+            data-player-id={player.id}
+            className={cn(
+                "flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 cursor-grab",
+                draggedPlayer?.id === player.id && "opacity-50"
+            )}
+            draggable
+            onDragStart={(e) => handleDragStart(e, player)}
+            onDragEnd={handleDragEnd}
+            onDrop={(e) => handleDrop(e, player.id)}
+            onDragOver={(e) => e.preventDefault()}
+            onTouchStart={() => handleTouchStart(player)}
+            onTouchEnd={(e) => handleTouchDrop(e, player.id)}
+        >
+            <span className="flex-1 font-medium truncate">{player.name}</span>
+            <span className="text-xs text-muted-foreground w-8 text-center">{player.positionName}</span>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={onEditClick}>
+                        <Pencil className="h-4 w-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Edit Player</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" onClick={onRemoveClick}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Remove Player</p></TooltipContent>
+            </Tooltip>
+        </li>
+    );
+});
+PlayerListItem.displayName = 'PlayerListItem';
+
+
 export default function FormationEditor() {
-  const [playerConfigs, setPlayerConfigs] = useState<PlayerConfigs>(initialPlayerConfigs);
+  const [playerConfigs, setPlayerConfigs] = useLocalStorage<PlayerConfigs>('footy-formation-configs', initialPlayerConfigs);
   const [playerCount, setPlayerCount] = useState<PlayerCount>('11');
   const [playPhase, setPlayPhase] = useState<PlayPhase>('attacking');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -94,7 +171,7 @@ export default function FormationEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
-  const [selectedFormationNames, setSelectedFormationNames] = useState(initialFormationNames);
+  const [selectedFormationNames, setSelectedFormationNames] = useLocalStorage('footy-formation-names', initialFormationNames);
 
   const [savedSetups, setSavedSetups] = useLocalStorage<Record<string, FormationSetup>>('footy-formation-setups', {});
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -104,15 +181,6 @@ export default function FormationEditor() {
   const [shareableLink, setShareableLink] = useState('');
   const [isDraggingOverBench, setIsDraggingOverBench] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
-
-  const [primaryColor, setPrimaryColor] = useLocalStorage<HSL>('theme-primary', { h: 16, s: 100, l: 50 });
-  const [accentColor, setAccentColor] = useLocalStorage<HSL>('theme-accent', { h: 120, s: 60, l: 50 });
-
-  useEffect(() => {
-    document.documentElement.style.setProperty('--primary', `${primaryColor.h} ${primaryColor.s}% ${primaryColor.l}%`);
-    document.documentElement.style.setProperty('--ring', `${primaryColor.h} ${primaryColor.s}% ${primaryColor.l}%`);
-    document.documentElement.style.setProperty('--accent', `${accentColor.h} ${accentColor.s}% ${accentColor.l}%`);
-  }, [primaryColor, accentColor]);
   
   useEffect(() => {
     const hash = window.location.hash.slice(1);
@@ -130,10 +198,6 @@ export default function FormationEditor() {
             ...prev,
             [data.playerCount]: data.formationNames,
           }));
-          if (data.theme) {
-            setPrimaryColor(data.theme.primary);
-            setAccentColor(data.theme.accent);
-          }
           toast({ title: "Shared formation loaded!", description: `The ${data.playerCount}v${data.playerCount} formation has been loaded.` });
           window.history.pushState("", document.title, window.location.pathname + window.location.search);
         }
@@ -142,10 +206,10 @@ export default function FormationEditor() {
         toast({ title: "Error", description: "Could not load the shared formation from the link.", variant: "destructive" });
       }
     }
-  }, [toast, setPrimaryColor, setAccentColor]);
+  }, [toast, setPlayerConfigs, setSelectedFormationNames]);
   
   const players = playerConfigs[playerCount][playPhase];
-  const setPlayers = (newPlayers: Player[] | ((prevPlayers: Player[]) => Player[])) => {
+  const setPlayers = useCallback((newPlayers: Player[] | ((prevPlayers: Player[]) => Player[])) => {
     setPlayerConfigs(prev => {
       const currentPlayers = prev[playerCount][playPhase];
       const updatedPlayers = typeof newPlayers === 'function' ? newPlayers(currentPlayers) : newPlayers;
@@ -157,10 +221,10 @@ export default function FormationEditor() {
         } 
       };
     });
-  };
+  }, [playerCount, playPhase, setPlayerConfigs]);
 
   const selectedFormationName = selectedFormationNames[playerCount][playPhase];
-  const setSelectedFormationName = (name: string) => {
+  const setSelectedFormationName = useCallback((name: string) => {
     setSelectedFormationNames(prev => ({ 
       ...prev, 
       [playerCount]: {
@@ -168,7 +232,7 @@ export default function FormationEditor() {
         [playPhase]: name
       } 
     }));
-  };
+  }, [playerCount, playPhase, setSelectedFormationNames]);
 
   const activePlayers = players.filter(p => !p.isBenched);
   const benchedPlayers = players.filter(p => p.isBenched);
@@ -181,7 +245,7 @@ export default function FormationEditor() {
     setPlayPhase(value as PlayPhase);
   }
 
-  const handleResetFormation = () => {
+  const handleResetFormation = useCallback(() => {
     const initialPlayers = playerCount === '11' ? initialPlayers11 : playerCount === '7' ? initialPlayers7 : initialPlayers6;
     const initialFormationName = initialFormationNames[playerCount][playPhase];
 
@@ -202,9 +266,9 @@ export default function FormationEditor() {
     }));
 
     toast({ title: "Formation Reset", description: `The ${playPhase} formation has been reset to the default.` });
-  };
+  }, [playerCount, playPhase, setPlayerConfigs, setSelectedFormationNames, toast]);
   
-  const handleFormationChange = (formationName: string) => {
+  const handleFormationChange = useCallback((formationName: string) => {
     let formations: Formation[];
     if (playerCount === '6') {
       formations = formations6;
@@ -233,16 +297,16 @@ export default function FormationEditor() {
 
       setSelectedFormationName(formationName);
     }
-  };
+  }, [playerCount, setPlayers, setSelectedFormationName]);
 
-  const handlePlayerPositionChange = (id: string, position: { x: number; y: number }) => {
+  const handlePlayerPositionChange = useCallback((id: string, position: { x: number; y: number }) => {
     setPlayers(prevPlayers =>
       prevPlayers.map(p => (p.id === id ? { ...p, position, isBenched: false } : p))
     );
     setSelectedFormationName("Custom");
-  };
+  }, [setPlayers, setSelectedFormationName]);
 
-  const handleAddPlayer = () => {
+  const handleAddPlayer = useCallback(() => {
     const newPlayer: Player = {
       id: `p${Date.now()}`,
       name: 'New Player',
@@ -251,22 +315,22 @@ export default function FormationEditor() {
       isBenched: true,
     };
     setPlayers(prev => [...prev, newPlayer]);
-  };
+  }, [setPlayers]);
   
-  const handleRemovePlayer = (id: string) => {
+  const handleRemovePlayer = useCallback((id: string) => {
     setPlayers(prev => prev.filter(p => p.id !== id));
     if (activePlayers.some(p => p.id === id)) {
       setSelectedFormationName("Custom");
     }
-  };
+  }, [setPlayers, setSelectedFormationName, activePlayers]);
 
-  const handleStartEdit = (player: Player) => {
+  const handleStartEdit = useCallback((player: Player) => {
     setEditingPlayer(player);
     setEditName(player.name);
     setEditPositionName(player.positionName);
-  };
+  }, []);
   
-  const handleSaveEdit = (e: FormEvent) => {
+  const handleSaveEdit = useCallback((e: FormEvent) => {
     e.preventDefault();
     if (editingPlayer) {
       setPlayers(prev => prev.map(p => (p.id === editingPlayer.id ? { ...p, name: editName, positionName: editPositionName } : p)));
@@ -277,13 +341,12 @@ export default function FormationEditor() {
         setSelectedFormationName("Custom");
       }
     }
-  };
+  }, [editingPlayer, editName, editPositionName, setPlayers, setSelectedFormationName]);
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     const data = JSON.stringify({ 
       playerConfigs, 
       selectedFormationNames,
-      theme: { primary: primaryColor, accent: accentColor }
     }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -291,18 +354,18 @@ export default function FormationEditor() {
     a.href = url;
     a.download = 'pitchline-formation.json';
     document.body.appendChild(a);
-    a.click();
+a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setImportExportDialogOpen(false);
-  };
+  }, [playerConfigs, selectedFormationNames]);
   
   const handleImportClick = () => {
     fileInputRef.current?.click();
     setImportExportDialogOpen(false);
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -315,10 +378,6 @@ export default function FormationEditor() {
                 importedConfigs['11'].attacking && importedConfigs['11'].defending) {
               setPlayerConfigs(importedConfigs);
               setSelectedFormationNames(data.selectedFormationNames || initialFormationNames);
-              if (data.theme) {
-                setPrimaryColor(data.theme.primary);
-                setAccentColor(data.theme.accent);
-              }
               toast({ title: "Success", description: "Formations imported successfully." });
             } else {
                throw new Error("Invalid file format");
@@ -333,24 +392,24 @@ export default function FormationEditor() {
       reader.readAsText(file);
     }
     if (e.target) e.target.value = '';
-  };
+  }, [setPlayerConfigs, setSelectedFormationNames, toast]);
 
   // Drag and Drop Logic
-  const handleDragStart = (e: DragEvent, player: Player) => {
+  const handleDragStart = useCallback((e: DragEvent, player: Player) => {
     e.dataTransfer.setData("playerId", player.id);
     setDraggedPlayer(player);
-  };
+  }, []);
 
-  const handleTouchStart = (player: Player) => {
+  const handleTouchStart = useCallback((player: Player) => {
     setDraggedPlayer(player);
-  };
+  }, []);
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
     setDraggedPlayer(null);
     setIsDraggingOverBench(false);
-  };
+  }, []);
   
-  const handlePlayerSwap = (sourceId: string, targetId: string) => {
+  const handlePlayerSwap = useCallback((sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
 
     setPlayers(prev => {
@@ -373,9 +432,9 @@ export default function FormationEditor() {
     if(!players.find(p => p.id === sourceId)?.isBenched || !players.find(p => p.id === targetId)?.isBenched){
       setSelectedFormationName("Custom");
     }
-  };
+  }, [players, setPlayers, setSelectedFormationName]);
 
-  const handleDrop = (e: DragEvent, targetPlayerId?: string) => {
+  const handleDrop = useCallback((e: DragEvent, targetPlayerId?: string) => {
     e.preventDefault();
     const sourcePlayerId = e.dataTransfer.getData("playerId");
 
@@ -397,9 +456,9 @@ export default function FormationEditor() {
     }
     setIsDraggingOverBench(false);
     setDraggedPlayer(null);
-  };
+  }, [handlePlayerSwap, handlePlayerPositionChange, setPlayers, setSelectedFormationName]);
 
-  const handleTouchDrop = (e: TouchEvent, targetPlayerId?: string) => {
+  const handleTouchDrop = useCallback((e: TouchEvent, targetPlayerId?: string) => {
     e.preventDefault();
     if (!draggedPlayer) return;
 
@@ -430,10 +489,10 @@ export default function FormationEditor() {
     }
     setIsDraggingOverBench(false);
     setDraggedPlayer(null);
-  };
+  }, [draggedPlayer, handlePlayerSwap, handlePlayerPositionChange, setPlayers, setSelectedFormationName]);
 
 
-  const handleSaveSetup = (e: FormEvent) => {
+  const handleSaveSetup = useCallback((e: FormEvent) => {
     e.preventDefault();
     if (!newSetupName) return;
 
@@ -442,61 +501,52 @@ export default function FormationEditor() {
       [newSetupName]: { 
         playerConfigs, 
         selectedFormationNames,
-        theme: { primary: primaryColor, accent: accentColor }
       }
     };
     setSavedSetups(newSavedSetups);
     toast({ title: "Setup Saved", description: `"${newSetupName}" has been saved.` });
     setSaveDialogOpen(false);
     setNewSetupName('');
-  };
+  }, [newSetupName, playerConfigs, selectedFormationNames, savedSetups, setSavedSetups, toast]);
 
-  const handleLoadSetup = (name: string) => {
+  const handleLoadSetup = useCallback((name: string) => {
     const setup = savedSetups[name];
     if (setup) {
       setPlayerConfigs(setup.playerConfigs);
       setSelectedFormationNames(setup.selectedFormationNames);
-      if (setup.theme) {
-        setPrimaryColor(setup.theme.primary);
-        setAccentColor(setup.theme.accent);
-      }
       toast({ title: "Setup Loaded", description: `"${name}" has been loaded.` });
     }
-  };
+  }, [savedSetups, setPlayerConfigs, setSelectedFormationNames, toast]);
 
-  const handleDeleteSetup = (name: string) => {
+  const handleDeleteSetup = useCallback((name: string) => {
     const newSavedSetups = { ...savedSetups };
     delete newSavedSetups[name];
     setSavedSetups(newSavedSetups);
     toast({ title: "Setup Deleted", description: `"${name}" has been deleted.`, variant: "destructive" });
-  };
+  }, [savedSetups, setSavedSetups, toast]);
 
-  const handleGenerateShareLink = () => {
+  const handleGenerateShareLink = useCallback(() => {
     const data: SharedFormation = { 
       playerCount,
       config: playerConfigs[playerCount],
       formationNames: selectedFormationNames[playerCount],
-      theme: {
-        primary: primaryColor,
-        accent: accentColor,
-      },
     };
     const jsonString = JSON.stringify(data);
     const encoded = btoa(jsonString);
     const link = `${window.location.origin}${window.location.pathname}#${encoded}`;
     setShareableLink(link);
     setShareDialogOpen(true);
-  };
+  }, [playerCount, playerConfigs, selectedFormationNames]);
 
-  const handleCopyLink = () => {
+  const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(shareableLink).then(() => {
       toast({ title: "Copied!", description: "The shareable link has been copied to your clipboard." });
     }, () => {
       toast({ title: "Error", description: "Failed to copy the link.", variant: "destructive" });
     });
-  };
+  }, [shareableLink, toast]);
 
-  const handleExportImage = () => {
+  const handleExportImage = useCallback(() => {
     const elementToCapture = canvasRef.current;
     if (elementToCapture) {
       const parent = elementToCapture.parentElement;
@@ -525,7 +575,7 @@ export default function FormationEditor() {
         parent.style.padding = originalPadding;
       });
     }
-  };
+  }, []);
   
 
   let currentFormations: Formation[];
@@ -537,61 +587,10 @@ export default function FormationEditor() {
     currentFormations = formations11;
   }
   
-  const PlayerListItem = ({ player }: { player: Player }) => (
-    <li
-      data-player-id={player.id}
-      className={cn(
-          "flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 cursor-grab",
-          draggedPlayer?.id === player.id && "opacity-50"
-      )}
-      draggable
-      onDragStart={(e) => handleDragStart(e, player)}
-      onDragEnd={handleDragEnd}
-      onDrop={(e) => handleDrop(e, player.id)}
-      onDragOver={(e) => e.preventDefault()}
-      onTouchStart={() => handleTouchStart(player)}
-      onTouchEnd={(e) => handleTouchDrop(e, player.id)}
-    >
-      <span className="flex-1 font-medium truncate">{player.name}</span>
-      <span className="text-xs text-muted-foreground w-8 text-center">{player.positionName}</span>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => handleStartEdit(player)}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Edit Player</p></TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" onClick={() => handleRemovePlayer(player.id)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Remove Player</p></TooltipContent>
-      </Tooltip>
-    </li>
-  );
-
   const previousPlayerConfig = useRef<Player[]>();
   useEffect(() => {
     previousPlayerConfig.current = players;
   }, [players]);
-
-  const ColorSlider = ({ label, value, onValueChange, max, step = 1 }: { label: string, value: number, onValueChange: (val: number) => void, max: number, step?: number }) => (
-    <div className="grid gap-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-xs">{label}</Label>
-        <span className="text-xs text-muted-foreground">{value}</span>
-      </div>
-      <Slider
-        value={[value]}
-        onValueChange={([val]) => onValueChange(val)}
-        max={max}
-        step={step}
-      />
-    </div>
-  );
 
   return (
     <TooltipProvider>
@@ -649,12 +648,7 @@ export default function FormationEditor() {
                               <DropdownMenuLabel>Load a Saved Setup</DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               {Object.keys(savedSetups).length > 0 ? Object.keys(savedSetups).map(name => (
-                                <DropdownMenuItem key={name} onSelect={() => handleLoadSetup(name)} className="flex justify-between items-center">
-                                  <span>{name}</span>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteSetup(name);}}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuItem>
+                                <SavedSetupMenuItem key={name} name={name} onLoad={handleLoadSetup} onDelete={handleDeleteSetup} />
                               )) : <DropdownMenuItem disabled>No saved setups found.</DropdownMenuItem>}
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -697,32 +691,6 @@ export default function FormationEditor() {
                   </AccordionContent>
                 </AccordionItem>
 
-                 <AccordionItem value="appearance">
-                  <AccordionTrigger className="p-4 font-semibold">
-                    <div className="flex items-center gap-2">
-                      <Palette className="h-5 w-5" />
-                      Appearance
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="p-4 pt-0 space-y-6">
-                      <div className="space-y-4">
-                        <Label className="font-semibold">Player Color</Label>
-                        <ColorSlider label="Hue" value={primaryColor.h} onValueChange={(h) => setPrimaryColor(c => ({...c, h}))} max={360} />
-                        <ColorSlider label="Saturation" value={primaryColor.s} onValueChange={(s) => setPrimaryColor(c => ({...c, s}))} max={100} />
-                        <ColorSlider label="Lightness" value={primaryColor.l} onValueChange={(l) => setPrimaryColor(c => ({...c, l}))} max={100} />
-                      </div>
-                       <Separator />
-                      <div className="space-y-4">
-                        <Label className="font-semibold">Field Color</Label>
-                        <ColorSlider label="Hue" value={accentColor.h} onValueChange={(h) => setAccentColor(c => ({...c, h}))} max={360} />
-                        <ColorSlider label="Saturation" value={accentColor.s} onValueChange={(s) => setAccentColor(c => ({...c, s}))} max={100} />
-                        <ColorSlider label="Lightness" value={accentColor.l} onValueChange={(l) => setAccentColor(c => ({...c, l}))} max={100} />
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-
                 <AccordionItem value="players">
                   <AccordionTrigger className="p-4 font-semibold">
                     <div className="flex items-center gap-2">
@@ -742,7 +710,18 @@ export default function FormationEditor() {
                         {activePlayers.length > 0 ? (
                           <ul className="space-y-2">
                             {activePlayers.map(player => (
-                              <PlayerListItem key={player.id} player={player} />
+                              <PlayerListItem 
+                                key={player.id} 
+                                player={player}
+                                draggedPlayer={draggedPlayer}
+                                handleDragStart={handleDragStart}
+                                handleDragEnd={handleDragEnd}
+                                handleDrop={handleDrop}
+                                handleTouchStart={handleTouchStart}
+                                handleTouchDrop={handleTouchDrop}
+                                onStartEdit={handleStartEdit}
+                                onRemove={handleRemovePlayer}
+                              />
                             ))}
                           </ul>
                         ) : (
@@ -771,7 +750,18 @@ export default function FormationEditor() {
                         {benchedPlayers.length > 0 ? (
                           <ul className="space-y-2">
                             {benchedPlayers.map(player => (
-                              <PlayerListItem key={player.id} player={player} />
+                                <PlayerListItem 
+                                    key={player.id} 
+                                    player={player}
+                                    draggedPlayer={draggedPlayer}
+                                    handleDragStart={handleDragStart}
+                                    handleDragEnd={handleDragEnd}
+                                    handleDrop={handleDrop}
+                                    handleTouchStart={handleTouchStart}
+                                    handleTouchDrop={handleTouchDrop}
+                                    onStartEdit={handleStartEdit}
+                                    onRemove={handleRemovePlayer}
+                                />
                             ))}
                           </ul>
                           ) : (
@@ -831,6 +821,7 @@ export default function FormationEditor() {
                         onTouchDrop={handleTouchDrop}
                         onTouchStart={handleTouchStart}
                         draggedPlayer={draggedPlayer}
+                        fieldPattern='stripes-vertical'
                     />
                 </div>
             </main>
@@ -925,3 +916,7 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
+
+    
+
+    

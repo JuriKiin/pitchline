@@ -1,5 +1,7 @@
+
 'use client';
 
+import * as React from 'react';
 import { DragEvent, useEffect, useRef, TouchEvent } from 'react';
 import type { Player } from '@/app/lib/types';
 import { cn } from '@/lib/utils';
@@ -61,7 +63,7 @@ export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchS
       key={player.id}
       data-player-id={player.id}
       className={cn(
-        'absolute w-[4.25rem] h-[4.25rem] rounded-full bg-primary text-primary-foreground flex flex-col items-center justify-center text-center p-1 shadow-lg cursor-grab select-none',
+        'absolute w-[4.25rem] h-[4.25rem] rounded-full bg-primary flex flex-col items-center justify-center text-center p-1 shadow-lg cursor-grab select-none text-primary-foreground',
         'hover:bg-primary/80',
         isDragged && 'cursor-grabbing shadow-2xl scale-110 z-10'
       )}
