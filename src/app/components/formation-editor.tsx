@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarProvider, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -474,111 +475,129 @@ export default function FormationEditor() {
             </div>
           </SidebarHeader>
           <SidebarContent>
-             <div className="p-4 space-y-4">
-              <div className='flex items-end gap-2'>
-                <div className='flex-1'>
-                  <Label className="text-sm font-medium mb-2 block">Saved Setups</Label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between">
-                        <span className="truncate">{Object.keys(savedSetups).length > 0 ? "Load Setup" : "No Setups"}</span> <Users className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64">
-                      <DropdownMenuLabel>Load a Saved Setup</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {Object.keys(savedSetups).length > 0 ? Object.keys(savedSetups).map(name => (
-                         <DropdownMenuItem key={name} onSelect={() => handleLoadSetup(name)} className="flex justify-between items-center">
-                          <span>{name}</span>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteSetup(name);}}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                         </DropdownMenuItem>
-                      )) : <DropdownMenuItem disabled>No saved setups found.</DropdownMenuItem>}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" onClick={() => setSaveDialogOpen(true)}>
-                      <Save className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Save Current Setup</p></TooltipContent>
-                </Tooltip>
-              </div>
+            <ScrollArea>
+              <Accordion type="multiple" defaultValue={['settings', 'players']} className="w-full">
+                <AccordionItem value="settings">
+                  <AccordionTrigger className="p-4 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-5 w-5" />
+                      Settings
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="p-4 pt-0 space-y-4">
+                      <div className='flex items-end gap-2'>
+                        <div className='flex-1'>
+                          <Label className="text-sm font-medium mb-2 block">Saved Setups</Label>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" className="w-full justify-between">
+                                <span className="truncate">{Object.keys(savedSetups).length > 0 ? "Load Setup" : "No Setups"}</span> <Users className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64">
+                              <DropdownMenuLabel>Load a Saved Setup</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {Object.keys(savedSetups).length > 0 ? Object.keys(savedSetups).map(name => (
+                                <DropdownMenuItem key={name} onSelect={() => handleLoadSetup(name)} className="flex justify-between items-center">
+                                  <span>{name}</span>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteSetup(name);}}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuItem>
+                              )) : <DropdownMenuItem disabled>No saved setups found.</DropdownMenuItem>}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button size="icon" onClick={() => setSaveDialogOpen(true)}>
+                              <Save className="h-5 w-5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Save Current Setup</p></TooltipContent>
+                        </Tooltip>
+                      </div>
 
-              <div>
-                <Label className="text-sm font-medium mb-2 block">Game Type</Label>
-                <Tabs value={playerCount} onValueChange={handlePlayerCountChange}>
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="11">11v11</TabsTrigger>
-                    <TabsTrigger value="7">7v7</TabsTrigger>
-                    <TabsTrigger value="6">6v6</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-               <div>
-                <Label className="text-sm font-medium mb-2 block">Formation</Label>
-                <Select value={selectedFormationName} onValueChange={handleFormationChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select formation" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currentFormations.map(f => (
-                      <SelectItem key={f.name} value={f.name}>{f.name}</SelectItem>
-                    ))}
-                     <SelectItem value="Custom" disabled>Custom</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <Separator />
-
-             <ScrollArea className="h-full">
-              <Card className="border-0 shadow-none rounded-none">
-                <CardHeader className="pt-4 pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Starting XI ({activePlayers.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
-                  {activePlayers.length > 0 ? (
-                    <ul className="space-y-2">
-                      {activePlayers.map(player => (
-                        <PlayerListItem key={player.id} player={player} />
-                      ))}
-                    </ul>
-                  ) : (
-                      <p className="text-sm text-muted-foreground">No players on the field.</p>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Separator />
-              <Card className="border-0 shadow-none rounded-none">
-                <CardHeader className="pt-4 pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5 text-muted-foreground" />
-                    Bench ({benchedPlayers.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
-                  {benchedPlayers.length > 0 ? (
-                    <ul className="space-y-2">
-                      {benchedPlayers.map(player => (
-                        <PlayerListItem key={player.id} player={player} />
-                      ))}
-                    </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">The bench is empty.</p>
-                    )}
-                </CardContent>
-              </Card>
+                      <div>
+                        <Label className="text-sm font-medium mb-2 block">Game Type</Label>
+                        <Tabs value={playerCount} onValueChange={handlePlayerCountChange}>
+                          <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="11">11v11</TabsTrigger>
+                            <TabsTrigger value="7">7v7</TabsTrigger>
+                            <TabsTrigger value="6">6v6</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium mb-2 block">Formation</Label>
+                        <Select value={selectedFormationName} onValueChange={handleFormationChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select formation" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {currentFormations.map(f => (
+                              <SelectItem key={f.name} value={f.name}>{f.name}</SelectItem>
+                            ))}
+                            <SelectItem value="Custom" disabled>Custom</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="players">
+                  <AccordionTrigger className="p-4 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Players
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <Card className="border-0 shadow-none rounded-none">
+                      <CardHeader className="pt-0 pb-2">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Users className="h-5 w-5" />
+                          Starting XI ({activePlayers.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-2">
+                        {activePlayers.length > 0 ? (
+                          <ul className="space-y-2">
+                            {activePlayers.map(player => (
+                              <PlayerListItem key={player.id} player={player} />
+                            ))}
+                          </ul>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">No players on the field.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                    
+                    <Separator />
+                    <Card className="border-0 shadow-none rounded-none">
+                      <CardHeader className="pt-4 pb-2">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Users className="h-5 w-5 text-muted-foreground" />
+                          Bench ({benchedPlayers.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-2">
+                        {benchedPlayers.length > 0 ? (
+                          <ul className="space-y-2">
+                            {benchedPlayers.map(player => (
+                              <PlayerListItem key={player.id} player={player} />
+                            ))}
+                          </ul>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">The bench is empty.</p>
+                          )}
+                      </CardContent>
+                    </Card>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </ScrollArea>
-
           </SidebarContent>
           <SidebarFooter>
              <Button className="w-full" onClick={handleAddPlayer}><Plus className="mr-2 h-4 w-4" /> Add Player</Button>
@@ -696,3 +715,5 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
+
+    
