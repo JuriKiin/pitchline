@@ -449,35 +449,35 @@ export default function FormationEditor() {
   };
 
   const handleExportImage = () => {
-    const canvasElement = canvasRef.current;
-    if (canvasElement) {
-      // Create a temporary wrapper to add padding
-      const wrapper = document.createElement('div');
-      wrapper.style.padding = '2rem';
-      wrapper.style.backgroundColor = '#1A202C';
-      
-      // Clone the element to avoid moving the original
-      const clonedElement = canvasElement.cloneNode(true) as HTMLElement;
-      wrapper.appendChild(clonedElement);
-      document.body.appendChild(wrapper);
-
-      html2canvas(wrapper, {
-        backgroundColor: '#1A202C',
+    const elementToCapture = canvasRef.current;
+    if (elementToCapture) {
+      const parent = elementToCapture.parentElement;
+      if (!parent) return;
+  
+      const originalBg = parent.style.backgroundColor;
+      const originalPadding = parent.style.padding;
+  
+      parent.style.backgroundColor = '#1A202C';
+      parent.style.padding = '2rem';
+  
+      html2canvas(parent, {
         logging: false,
         useCORS: true,
-        scale: 2 
+        scale: 2
       }).then(canvas => {
         const image = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = 'pitchline-formation.png';
         link.href = image;
         link.click();
-        
-        // Clean up the temporary wrapper
-        document.body.removeChild(wrapper);
+  
+        // Revert styles
+        parent.style.backgroundColor = originalBg;
+        parent.style.padding = originalPadding;
       });
     }
   };
+  
 
   let currentFormations: Formation[];
   if (playerCount === '6') {
@@ -835,5 +835,3 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
-
-    
