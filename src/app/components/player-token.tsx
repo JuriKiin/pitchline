@@ -66,7 +66,7 @@ export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchS
       onDragOver={handleDragOver}
     >
       <User className="w-5 h-5 mb-0.5" />
-      <span className="text-xs font-medium leading-tight truncate w-full px-1">{player.name}</span>
+      <span className="text-xs font-medium leading-tight truncate w-full px-1">{player.positionName}</span>
     </div>
   );
 }

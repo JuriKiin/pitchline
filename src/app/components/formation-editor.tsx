@@ -66,6 +66,7 @@ export default function FormationEditor() {
   const [playPhase, setPlayPhase] = useState<PlayPhase>('attacking');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [editName, setEditName] = useState('');
+  const [editPositionName, setEditPositionName] = useState('');
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -183,8 +184,9 @@ export default function FormationEditor() {
 
         const newActivePlayers = formation.players.map((p, index) => ({
           ...p,
-          id: activePrevPlayers[index]?.id || p.id,
-          name: activePrevPlayers[index]?.name || p.name,
+          id: activePrevPlayers[index]?.id || `p${Date.now()}${index}`,
+          name: activePrevPlayers[index]?.name || `Player ${index + 1}`,
+          positionName: p.positionName,
           isBenched: false,
         }));
         
@@ -206,6 +208,7 @@ export default function FormationEditor() {
     const newPlayer: Player = {
       id: `p${Date.now()}`,
       name: 'New Player',
+      positionName: 'SUB',
       position: { x: 50, y: 50 },
       isBenched: activePlayers.length >= parseInt(playerCount, 10),
     };
@@ -225,14 +228,16 @@ export default function FormationEditor() {
   const handleStartEdit = (player: Player) => {
     setEditingPlayer(player);
     setEditName(player.name);
+    setEditPositionName(player.positionName);
   };
   
   const handleSaveEdit = (e: FormEvent) => {
     e.preventDefault();
     if (editingPlayer) {
-      setPlayers(prev => prev.map(p => (p.id === editingPlayer.id ? { ...p, name: editName } : p)));
+      setPlayers(prev => prev.map(p => (p.id === editingPlayer.id ? { ...p, name: editName, positionName: editPositionName } : p)));
       setEditingPlayer(null);
       setEditName('');
+      setEditPositionName('');
       if (!editingPlayer.isBenched) {
         setSelectedFormationName("Custom");
       }
@@ -424,7 +429,7 @@ export default function FormationEditor() {
             <Pencil className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent><p>Edit Name</p></TooltipContent>
+        <TooltipContent><p>Edit Player</p></TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -643,13 +648,17 @@ export default function FormationEditor() {
         <Dialog open={!!editingPlayer} onOpenChange={(isOpen) => !isOpen && setEditingPlayer(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Player Name</DialogTitle>
+              <DialogTitle>Edit Player</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSaveEdit}>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="name" className="text-right">Name</Label>
                   <Input id="name" value={editName} onChange={(e) => setEditName(e.target.value)} className="col-span-3" autoFocus />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="positionName" className="text-right">Position</Label>
+                  <Input id="positionName" value={editPositionName} onChange={(e) => setEditPositionName(e.target.value)} className="col-span-3" />
                 </div>
               </div>
               <DialogFooter>
@@ -715,5 +724,3 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
-
-    
