@@ -94,7 +94,7 @@ export default function FormationEditor() {
             ...prev,
             [data.playerCount]: data.formationNames,
           }));
-          toast({ title: "Shared formation loaded!", description: `The ${data.playerCount}-a-side formation has been loaded.` });
+          toast({ title: "Shared formation loaded!", description: `The ${data.playerCount}v${data.playerCount} formation has been loaded.` });
           window.history.pushState("", document.title, window.location.pathname + window.location.search);
         }
       } catch (e) {
@@ -244,7 +244,7 @@ export default function FormationEditor() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'footy-formation.txt';
+    a.download = 'pitchline-formation.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -450,7 +450,7 @@ export default function FormationEditor() {
              <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Logo className="h-8 w-8 text-primary" />
-                <h1 className="text-xl font-bold">Footy</h1>
+                <h1 className="text-xl font-bold">Pitchline</h1>
               </div>
               <div className="flex items-center gap-1">
                 <Tooltip>
