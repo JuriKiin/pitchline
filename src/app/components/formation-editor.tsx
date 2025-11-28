@@ -35,9 +35,9 @@ interface PlayerConfigs {
 
 export default function FormationEditor() {
   const [playerConfigs, setPlayerConfigs] = useState<PlayerConfigs>({
-    '11': { attacking: initialPlayers11, defending: initialPlayers11 },
-    '7': { attacking: initialPlayers7, defending: initialPlayers7 },
-    '6': { attacking: initialPlayers6, defending: initialPlayers6 },
+    '11': { attacking: initialPlayers11, defending: JSON.parse(JSON.stringify(initialPlayers11)) },
+    '7': { attacking: initialPlayers7, defending: JSON.parse(JSON.stringify(initialPlayers7)) },
+    '6': { attacking: initialPlayers6, defending: JSON.parse(JSON.stringify(initialPlayers6)) },
   });
   const [playerCount, setPlayerCount] = useState<PlayerCount>('11');
   const [playPhase, setPlayPhase] = useState<PlayPhase>('attacking');
@@ -93,44 +93,49 @@ export default function FormationEditor() {
   const handleResetFormation = () => {
     let initialPlayers: Player[];
     let initialFormationName: string;
+    let baseFormations: Formation[];
+
     if (playerCount === '6') {
-      initialPlayers = initialPlayers6;
-      initialFormationName = formations6[0].name;
+      baseFormations = formations6;
+      initialFormationName = baseFormations[0].name;
     } else if (playerCount === '7') {
-      initialPlayers = initialPlayers7;
-      initialFormationName = formations7[0].name;
+      baseFormations = formations7;
+      initialFormationName = baseFormations[0].name;
     } else {
-      initialPlayers = initialPlayers11;
-      initialFormationName = formations11[1].name;
+      baseFormations = formations11;
+      initialFormationName = baseFormations[1].name;
     }
-    
-    // Preserve existing players and their names, but reset positions
+
+    const formation = baseFormations.find(f => f.name === initialFormationName);
+    if (!formation) return;
+    initialPlayers = formation.players;
+
     setPlayers(prev => {
-      const activeInitial = initialPlayers.filter(p => !p.isBenched);
       const prevActive = prev.filter(p => !p.isBenched);
       const prevBenched = prev.filter(p => p.isBenched);
 
-      // Map old players to new default positions
-      const newActive = activeInitial.map((initialPlayer, index) => {
+      // Map old active players to new default positions, keeping their names
+      const newActive = initialPlayers.map((initialPlayer, index) => {
         const existingPlayer = prevActive[index];
         return {
           ...initialPlayer,
-          id: existingPlayer?.id || initialPlayer.id,
+          id: existingPlayer?.id || initialPlayer.id, // Keep original ID if possible
           name: existingPlayer?.name || initialPlayer.name,
         };
       });
 
-      // Keep benched players as they were, but ensure the right number of subs
+      // Keep benched players, but adjust if the number of subs changes
+      const totalPlayersInFormation = parseInt(playerCount, 10);
+      const subCount = players.length - totalPlayersInFormation;
+      
       let updatedBenched = [...prevBenched];
-      const subDiff = (initialPlayers.length - activeInitial.length) - updatedBenched.length;
-      if (subDiff > 0) {
-        for(let i=0; i< subDiff; i++) {
-          updatedBenched.push({ id: `s_new_${Date.now()}_${i}`, name: `Sub ${updatedBenched.length + i + 1}`, position: { x: 0, y: 0 }, isBenched: true });
+      if (updatedBenched.length > subCount && subCount >= 0) {
+        updatedBenched = updatedBenched.slice(0, subCount);
+      } else {
+        for (let i = updatedBenched.length; i < subCount; i++) {
+          updatedBenched.push({ id: `s_new_${Date.now()}_${i}`, name: `Sub ${i + 1}`, position: { x: 0, y: 0 }, isBenched: true });
         }
-      } else if (subDiff < 0) {
-        updatedBenched = updatedBenched.slice(0, initialPlayers.length - activeInitial.length);
       }
-
 
       return [...newActive, ...updatedBenched];
     });
@@ -152,25 +157,17 @@ export default function FormationEditor() {
     const formation = formations.find(f => f.name === formationName);
     if (formation) {
       setPlayers(prevPlayers => {
-        const currentBenched = prevPlayers.filter(p => p.isBenched);
-        const formationPlayers = formation.players.map((p, index) => {
-            const existingPlayer = prevPlayers.find(ep => !ep.isBenched && ep.id.startsWith('p'));
-            return {...p, name: prevPlayers[index]?.name || p.name, isBenched: false};
-        });
-        const maxActive = parseInt(playerCount, 10);
-        
-        let combinedActive = [...formationPlayers];
-        let combinedBenched = [...currentBenched];
+        const activePrevPlayers = prevPlayers.filter(p => !p.isBenched);
+        const benchedPrevPlayers = prevPlayers.filter(p => p.isBenched);
 
-        while (combinedActive.length > maxActive) {
-          const playerToBench = combinedActive.pop();
-          if(playerToBench) {
-            playerToBench.isBenched = true;
-            combinedBenched.unshift(playerToBench);
-          }
-        }
+        const newActivePlayers = formation.players.map((p, index) => ({
+          ...p,
+          id: activePrevPlayers[index]?.id || p.id,
+          name: activePrevPlayers[index]?.name || p.name,
+          isBenched: false,
+        }));
         
-        return [...combinedActive, ...combinedBenched];
+        return [...newActivePlayers, ...benchedPrevPlayers];
       });
 
       setSelectedFormationName(formationName);
@@ -222,7 +219,7 @@ export default function FormationEditor() {
   };
 
   const handleExport = () => {
-    const data = JSON.stringify({ playerConfigs }, null, 2);
+    const data = JSON.stringify({ playerConfigs, selectedFormationNames }, null, 2);
     const blob = new Blob([data], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -251,7 +248,7 @@ export default function FormationEditor() {
             if (importedConfigs['11'] && importedConfigs['7'] && importedConfigs['6'] &&
                 importedConfigs['11'].attacking && importedConfigs['11'].defending) {
               setPlayerConfigs(importedConfigs);
-              setSelectedFormationName("Custom");
+              setSelectedFormationNames(data.selectedFormationNames || selectedFormationNames);
               toast({ title: "Success", description: "Formations imported successfully." });
             } else {
                throw new Error("Invalid file format");
@@ -299,9 +296,17 @@ export default function FormationEditor() {
     setDraggedPlayerId(null);
   };
 
-  const handleTouchEndOnPlayer = (targetPlayerId: string) => {
+  const handleTouchEndOnPlayer = (e: TouchEvent<HTMLLIElement>) => {
     if (!draggedPlayerId) return;
-    handlePlayerSwap(draggedPlayerId, targetPlayerId);
+
+    const touch = e.changedTouches[0];
+    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetLi = targetElement?.closest('li');
+
+    if (targetLi && targetLi.dataset.playerId) {
+      handlePlayerSwap(draggedPlayerId, targetLi.dataset.playerId);
+    }
+    
     setDraggedPlayerId(null);
   };
 
@@ -319,10 +324,10 @@ export default function FormationEditor() {
         
         const newPlayers = [...prev];
 
-        // If players are in different lists (bench vs active), swap their roles
+        // If players are in different lists (bench vs active), swap everything but position
         if (sourcePlayer.isBenched !== targetPlayer.isBenched) {
-            newPlayers[sourceIndex] = { ...targetPlayer, position: sourcePlayer.position };
-            newPlayers[targetIndex] = { ...sourcePlayer, position: targetPlayer.position };
+            newPlayers[sourceIndex] = { ...targetPlayer, position: sourcePlayer.position, isBenched: sourcePlayer.isBenched };
+            newPlayers[targetIndex] = { ...sourcePlayer, position: targetPlayer.position, isBenched: targetPlayer.isBenched };
         } else {
           // If in the same list, just swap their positions in the array to reorder
           newPlayers[sourceIndex] = targetPlayer;
@@ -332,7 +337,9 @@ export default function FormationEditor() {
         return newPlayers;
     });
 
-    setSelectedFormationName("Custom");
+    if(!players.find(p => p.id === sourceId)?.isBenched || !players.find(p => p.id === targetId)?.isBenched){
+      setSelectedFormationName("Custom");
+    }
   };
 
   let currentFormations: Formation[];
@@ -347,22 +354,14 @@ export default function FormationEditor() {
   const PlayerListItem = ({ player }: { player: Player }) => (
     <li
       key={player.id}
+      data-player-id={player.id}
       className="flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 transition-colors cursor-grab"
       draggable
       onDragStart={(e) => handleDragStart(e, player.id)}
       onDrop={(e) => handleDropOnPlayer(e, player.id)}
       onDragOver={(e) => e.preventDefault()}
       onTouchStart={() => handleTouchStart(player.id)}
-      onTouchEnd={(e) => {
-          const touch = e.changedTouches[0];
-          const element = document.elementFromPoint(touch.clientX, touch.clientY);
-          const targetLi = element?.closest('li');
-          const targetPlayerId = players.find(p => `player-li-${p.id}` === targetLi?.id)?.id
-          if (targetPlayerId) {
-            handleTouchEndOnPlayer(targetPlayerId);
-          }
-      }}
-      id={`player-li-${player.id}`}
+      onTouchEnd={handleTouchEndOnPlayer}
     >
       <span className="flex-1 font-medium truncate">{player.name}</span>
       <Tooltip>
@@ -544,5 +543,3 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
-
-    
