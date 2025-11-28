@@ -19,36 +19,45 @@ import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Separator } from '@/components/ui/separator';
 
+type PlayerCount = '11' | '7' | '6';
+
 export default function FormationEditor() {
-  const [players, setPlayers] = useState<Player[]>(initialPlayers11);
-  const [playerCount, setPlayerCount] = useState<string>('11');
+  const [playerConfigs, setPlayerConfigs] = useState({
+    '11': initialPlayers11,
+    '7': initialPlayers7,
+    '6': initialPlayers6,
+  });
+  const [playerCount, setPlayerCount] = useState<PlayerCount>('11');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [editName, setEditName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const [selectedFormationName, setSelectedFormationName] = useState<string>(formations11[1].name);
+  
+  const [selectedFormationNames, setSelectedFormationNames] = useState({
+    '11': formations11[1].name,
+    '7': formations7[0].name,
+    '6': formations6[0].name,
+  });
+  
+  const players = playerConfigs[playerCount];
+  const setPlayers = (newPlayers: Player[] | ((prevPlayers: Player[]) => Player[])) => {
+    setPlayerConfigs(prev => {
+      const currentPlayers = prev[playerCount];
+      const updatedPlayers = typeof newPlayers === 'function' ? newPlayers(currentPlayers) : newPlayers;
+      return { ...prev, [playerCount]: updatedPlayers };
+    });
+  };
+
+  const selectedFormationName = selectedFormationNames[playerCount];
+  const setSelectedFormationName = (name: string) => {
+    setSelectedFormationNames(prev => ({ ...prev, [playerCount]: name }));
+  };
 
   const activePlayers = players.filter(p => !p.isBenched);
   const benchedPlayers = players.filter(p => p.isBenched);
 
   const handlePlayerCountChange = (value: string) => {
-    setPlayerCount(value);
-    let newPlayers: Player[];
-    let newFormations: Formation[];
-    
-    if (value === '6') {
-      newPlayers = initialPlayers6;
-      newFormations = formations6;
-    } else if (value === '7') {
-      newPlayers = initialPlayers7;
-      newFormations = formations7;
-    } else {
-      newPlayers = initialPlayers11;
-      newFormations = formations11;
-    }
-    
-    setPlayers(newPlayers);
-    setSelectedFormationName(newFormations[0].name);
+    setPlayerCount(value as PlayerCount);
   };
   
   const handleFormationChange = (formationName: string) => {
@@ -155,10 +164,11 @@ export default function FormationEditor() {
         try {
           const data = JSON.parse(event.target?.result as string);
           if (data.playerCount && data.players) {
-            setPlayerCount(data.playerCount.toString());
+            const importedCount = data.playerCount.toString() as PlayerCount;
             // Ensure isBenched property exists
             const importedPlayers = data.players.map((p: Player) => ({ ...p, isBenched: p.isBenched || false }));
-            setPlayers(importedPlayers);
+            setPlayerCount(importedCount);
+            setPlayerConfigs(prev => ({...prev, [importedCount]: importedPlayers}));
             setSelectedFormationName("Custom");
             toast({ title: "Success", description: "Formation imported successfully." });
           } else {
