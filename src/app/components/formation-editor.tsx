@@ -337,15 +337,22 @@ export default function FormationEditor() {
     }
   };
 
-  const handleDropOnPlayer = (e: DragEvent, targetPlayerId?: string) => {
+  const handleDrop = (e: DragEvent, targetPlayerId?: string) => {
     e.preventDefault();
     const sourcePlayerId = e.dataTransfer.getData("playerId");
 
-    if (sourcePlayerId && targetPlayerId && sourcePlayerId !== targetPlayerId) {
+    if (sourcePlayerId && targetPlayerId) {
         handlePlayerSwap(sourcePlayerId, targetPlayerId);
-    } else if (sourcePlayerId && !targetPlayerId) {
+    } else if (sourcePlayerId) {
+        const targetIsCanvas = (e.target as HTMLElement).hasAttribute('data-canvas-dropzone');
         const targetIsBench = (e.target as HTMLElement).closest('[data-bench-dropzone="true"]');
-        if (targetIsBench) {
+
+        if (targetIsCanvas) {
+            const canvasRect = (e.target as HTMLElement).getBoundingClientRect();
+            const x = (e.clientX - canvasRect.left) / canvasRect.width * 100;
+            const y = (e.clientY - canvasRect.top) / canvasRect.height * 100;
+            handlePlayerPositionChange(sourcePlayerId, { x, y });
+        } else if (targetIsBench) {
             setPlayers(prev => prev.map(p => p.id === sourcePlayerId ? { ...p, isBenched: true } : p));
             setSelectedFormationName("Custom");
         }
@@ -362,12 +369,18 @@ export default function FormationEditor() {
 
     if (targetPlayerId && sourcePlayerId !== targetPlayerId) {
         handlePlayerSwap(sourcePlayerId, targetPlayerId);
-    } else if (!targetPlayerId) {
+    } else {
         const touch = e.changedTouches[0];
         const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
         const targetIsBench = targetElement?.closest('[data-bench-dropzone="true"]');
+        const targetIsCanvas = targetElement?.hasAttribute('data-canvas-dropzone');
 
-        if (targetIsBench) {
+        if (targetIsCanvas) {
+            const canvasRect = targetElement.getBoundingClientRect();
+            const x = (touch.clientX - canvasRect.left) / canvasRect.width * 100;
+            const y = (touch.clientY - canvasRect.top) / canvasRect.height * 100;
+            handlePlayerPositionChange(sourcePlayerId, {x, y});
+        } else if (targetIsBench) {
             setPlayers(prev => prev.map(p => p.id === sourcePlayerId ? { ...p, isBenched: true } : p));
             setSelectedFormationName("Custom");
         }
@@ -447,7 +460,7 @@ export default function FormationEditor() {
       draggable
       onDragStart={(e) => handleDragStart(e, player)}
       onDragEnd={handleDragEnd}
-      onDrop={(e) => handleDropOnPlayer(e, player.id)}
+      onDrop={(e) => handleDrop(e, player.id)}
       onDragOver={(e) => e.preventDefault()}
       onTouchStart={() => handleTouchStart(player)}
       onTouchEnd={(e) => handleTouchDrop(e, player.id)}
@@ -614,7 +627,7 @@ export default function FormationEditor() {
                     <Card 
                       className={cn("border-0 shadow-none rounded-none transition-colors", isDraggingOverBench && "bg-muted/50")}
                       data-bench-dropzone="true"
-                      onDrop={handleDropOnPlayer}
+                      onDrop={handleDrop}
                       onDragOver={(e) => e.preventDefault()}
                       onDragEnter={() => setIsDraggingOverBench(true)}
                       onDragLeave={() => setIsDraggingOverBench(false)}
@@ -677,7 +690,7 @@ export default function FormationEditor() {
                         players={activePlayers}
                         previousPlayers={previousPlayerConfig.current?.filter(p => !p.isBenched) || []}
                         onPlayerPositionChange={handlePlayerPositionChange}
-                        onPlayerDrop={handleDropOnPlayer}
+                        onPlayerDrop={handleDrop}
                         onTouchDrop={handleTouchDrop}
                         onTouchStart={handleTouchStart}
                         draggedPlayer={draggedPlayer}

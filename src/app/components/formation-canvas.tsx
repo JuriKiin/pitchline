@@ -65,29 +65,6 @@ export default function FormationCanvas({
     e.preventDefault();
   };
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const draggedPlayerId = e.dataTransfer.getData('playerId');
-    if (!draggedPlayerId) return;
-
-    // Check if dropping on the canvas itself (not a player token)
-    if ((e.target as HTMLElement).hasAttribute('data-canvas-dropzone')) {
-      if (!canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      const newXPercent = (x / rect.width) * 100;
-      const newYPercent = (y / rect.height) * 100;
-      
-      onPlayerPositionChange(draggedPlayerId, { x: newXPercent, y: newYPercent });
-    } else {
-        // This case is handled by onPlayerDrop in PlayerToken for swaps,
-        // but we still call the main drop handler to consolidate logic if needed.
-        onPlayerDrop(e);
-    }
-  };
-
   return (
     <div 
       className="relative w-full h-full bg-accent/30 dark:bg-accent/20 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none"
@@ -98,7 +75,7 @@ export default function FormationCanvas({
       onTouchMove={handleTouchMove}
       onTouchEnd={(e) => onTouchDrop(e)}
       onDragOver={handleDragOver}
-      onDrop={handleDrop}
+      onDrop={onPlayerDrop}
       data-canvas-dropzone="true"
     >
       {/* Field Markings */}
