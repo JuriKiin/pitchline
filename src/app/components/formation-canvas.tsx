@@ -8,9 +8,11 @@ interface FormationCanvasProps {
   players: Player[];
   onPlayerPositionChange: (id: string, position: { x: number; y: number }) => void;
   onPlayerDrop: (e: DragEvent, targetPlayerId: string) => void;
+  onPlayerClick: (id: string) => void;
+  swapPlayerId: string | null;
 }
 
-export default function FormationCanvas({ players, onPlayerPositionChange, onPlayerDrop }: FormationCanvasProps) {
+export default function FormationCanvas({ players, onPlayerPositionChange, onPlayerDrop, onPlayerClick, swapPlayerId }: FormationCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
 
@@ -49,6 +51,10 @@ export default function FormationCanvas({ players, onPlayerPositionChange, onPla
   };
   
   const handleInteractionStart = (player: Player) => {
+    if (swapPlayerId) {
+      onPlayerClick(player.id);
+      return;
+    }
     setDraggedPlayerId(player.id);
   };
 
@@ -97,6 +103,8 @@ export default function FormationCanvas({ players, onPlayerPositionChange, onPla
           onInteractionStart={handleInteractionStart}
           isDragged={draggedPlayerId === player.id}
           onDrop={(e) => onPlayerDrop(e, player.id)}
+          isSwapTarget={!!swapPlayerId && swapPlayerId !== player.id}
+          isSwapSource={swapPlayerId === player.id}
         />
       ))}
     </div>

@@ -13,11 +13,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, ArrowRightLeft, X } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -44,6 +45,7 @@ export default function FormationEditor() {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [editName, setEditName] = useState('');
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
+  const [swapPlayerId, setSwapPlayerId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -84,10 +86,12 @@ export default function FormationEditor() {
 
   const handlePlayerCountChange = (value: string) => {
     setPlayerCount(value as PlayerCount);
+    setSwapPlayerId(null);
   };
 
   const handlePhaseChange = (value: string) => {
     setPlayPhase(value as PlayPhase);
+    setSwapPlayerId(null);
   }
 
   const handleResetFormation = () => {
@@ -142,6 +146,7 @@ export default function FormationEditor() {
 
     setSelectedFormationName(initialFormationName);
     toast({ title: "Formation Reset", description: `The ${playPhase} formation has been reset to the default.` });
+    setSwapPlayerId(null);
   };
   
   const handleFormationChange = (formationName: string) => {
@@ -172,9 +177,14 @@ export default function FormationEditor() {
 
       setSelectedFormationName(formationName);
     }
+    setSwapPlayerId(null);
   };
 
   const handlePlayerPositionChange = (id: string, position: { x: number; y: number }) => {
+    if (swapPlayerId) {
+      handlePlayerSwap(swapPlayerId, id);
+      return;
+    }
     setPlayers(prevPlayers =>
       prevPlayers.map(p => (p.id === id ? { ...p, position, isBenched: false } : p))
     );
@@ -199,11 +209,15 @@ export default function FormationEditor() {
     if (activePlayers.some(p => p.id === id)) {
       setSelectedFormationName("Custom");
     }
+    if (swapPlayerId === id) {
+      setSwapPlayerId(null);
+    }
   };
 
   const handleStartEdit = (player: Player) => {
     setEditingPlayer(player);
     setEditName(player.name);
+    setSwapPlayerId(null);
   };
   
   const handleSaveEdit = (e: FormEvent) => {
@@ -278,6 +292,7 @@ export default function FormationEditor() {
       reader.readAsText(file);
     }
     if (e.target) e.target.value = '';
+    setSwapPlayerId(null);
   };
 
   const handleDragStart = (e: DragEvent, playerId: string) => {
@@ -295,23 +310,26 @@ export default function FormationEditor() {
     handlePlayerSwap(sourcePlayerId, targetPlayerId);
     setDraggedPlayerId(null);
   };
-
-  const handleTouchEndOnPlayer = (e: TouchEvent<HTMLLIElement>) => {
-    if (!draggedPlayerId) return;
-
-    const touch = e.changedTouches[0];
-    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-    const targetLi = targetElement?.closest('li');
-
-    if (targetLi && targetLi.dataset.playerId) {
-      handlePlayerSwap(draggedPlayerId, targetLi.dataset.playerId);
+  
+  const handlePlayerClick = (playerId: string) => {
+    if (swapPlayerId) {
+      handlePlayerSwap(swapPlayerId, playerId);
     }
-    
-    setDraggedPlayerId(null);
+  };
+  
+  const handleSwapButtonClick = (playerId: string) => {
+    if (swapPlayerId === playerId) {
+      setSwapPlayerId(null); // Deselect if clicking the same player's swap button
+    } else {
+      setSwapPlayerId(playerId);
+    }
   };
 
   const handlePlayerSwap = (sourceId: string | null, targetId: string) => {
-    if (!sourceId || sourceId === targetId) return;
+    if (!sourceId || sourceId === targetId) {
+      setSwapPlayerId(null);
+      return;
+    }
 
     setPlayers(prev => {
         const sourceIndex = prev.findIndex(p => p.id === sourceId);
@@ -324,7 +342,7 @@ export default function FormationEditor() {
         
         const newPlayers = [...prev];
 
-        // If players are in different lists (bench vs active), swap everything but position
+        // If players are in different lists (bench vs active), swap everything but position & benched status
         if (sourcePlayer.isBenched !== targetPlayer.isBenched) {
             newPlayers[sourceIndex] = { ...targetPlayer, position: sourcePlayer.position, isBenched: sourcePlayer.isBenched };
             newPlayers[targetIndex] = { ...sourcePlayer, position: targetPlayer.position, isBenched: targetPlayer.isBenched };
@@ -340,6 +358,7 @@ export default function FormationEditor() {
     if(!players.find(p => p.id === sourceId)?.isBenched || !players.find(p => p.id === targetId)?.isBenched){
       setSelectedFormationName("Custom");
     }
+    setSwapPlayerId(null); // Exit swap mode after a successful swap
   };
 
   let currentFormations: Formation[];
@@ -355,18 +374,35 @@ export default function FormationEditor() {
     <li
       key={player.id}
       data-player-id={player.id}
-      className="flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 transition-colors cursor-grab"
-      draggable
-      onDragStart={(e) => handleDragStart(e, player.id)}
+      className={cn(
+        "flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 transition-all duration-150",
+        swapPlayerId === player.id && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+        !!swapPlayerId && swapPlayerId !== player.id && 'cursor-pointer',
+        !swapPlayerId && 'cursor-grab'
+      )}
+      draggable={!swapPlayerId}
+      onDragStart={(e) => !swapPlayerId && handleDragStart(e, player.id)}
       onDrop={(e) => handleDropOnPlayer(e, player.id)}
       onDragOver={(e) => e.preventDefault()}
-      onTouchStart={() => handleTouchStart(player.id)}
-      onTouchEnd={handleTouchEndOnPlayer}
+      onClick={() => handlePlayerClick(player.id)}
     >
       <span className="flex-1 font-medium truncate">{player.name}</span>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => handleStartEdit(player)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8 cursor-pointer", swapPlayerId === player.id && "text-destructive hover:text-destructive")}
+            onClick={(e) => { e.stopPropagation(); handleSwapButtonClick(player.id); }}
+          >
+            {swapPlayerId === player.id ? <X className="h-4 w-4" /> : <ArrowRightLeft className="h-4 w-4" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>{swapPlayerId === player.id ? 'Cancel Swap' : 'Swap Player'}</p></TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={(e) => {e.stopPropagation(); handleStartEdit(player)}}>
             <Pencil className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
@@ -374,7 +410,7 @@ export default function FormationEditor() {
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" onClick={() => handleRemovePlayer(player.id)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" onClick={(e) => {e.stopPropagation(); handleRemovePlayer(player.id)}}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
@@ -517,6 +553,8 @@ export default function FormationEditor() {
                     players={activePlayers} 
                     onPlayerPositionChange={handlePlayerPositionChange}
                     onPlayerDrop={handleDropOnPlayer}
+                    onPlayerClick={handlePlayerClick}
+                    swapPlayerId={swapPlayerId}
                 />
             </div>
         </main>
