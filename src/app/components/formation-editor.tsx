@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, FormEvent, DragEvent } from 'react';
+import { useState, useRef, ChangeEvent, FormEvent, DragEvent, TouchEvent } from 'react';
 import { initialPlayers6, initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
 import type { Player } from '@/app/lib/types';
 import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
@@ -43,6 +43,7 @@ export default function FormationEditor() {
   const [playPhase, setPlayPhase] = useState<PlayPhase>('attacking');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [editName, setEditName] = useState('');
+  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -106,7 +107,6 @@ export default function FormationEditor() {
     // Preserve existing players and their names, but reset positions
     setPlayers(prev => {
       const activeInitial = initialPlayers.filter(p => !p.isBenched);
-      const benchedInitial = initialPlayers.filter(p => p.isBenched);
       const prevActive = prev.filter(p => !p.isBenched);
       const prevBenched = prev.filter(p => p.isBenched);
 
@@ -120,8 +120,19 @@ export default function FormationEditor() {
         };
       });
 
-      // Keep benched players as they were
-      return [...newActive, ...prevBenched];
+      // Keep benched players as they were, but ensure the right number of subs
+      let updatedBenched = [...prevBenched];
+      const subDiff = (initialPlayers.length - activeInitial.length) - updatedBenched.length;
+      if (subDiff > 0) {
+        for(let i=0; i< subDiff; i++) {
+          updatedBenched.push({ id: `s_new_${Date.now()}_${i}`, name: `Sub ${updatedBenched.length + i + 1}`, position: { x: 0, y: 0 }, isBenched: true });
+        }
+      } else if (subDiff < 0) {
+        updatedBenched = updatedBenched.slice(0, initialPlayers.length - activeInitial.length);
+      }
+
+
+      return [...newActive, ...updatedBenched];
     });
 
     setSelectedFormationName(initialFormationName);
@@ -140,23 +151,28 @@ export default function FormationEditor() {
 
     const formation = formations.find(f => f.name === formationName);
     if (formation) {
-      const currentBenched = players.filter(p => p.isBenched);
-      const formationPlayers = formation.players.map(p => ({...p, isBenched: false}));
-      const maxActive = parseInt(playerCount, 10);
-      
-      const combined = [...formationPlayers, ...currentBenched];
-      const active = combined.filter(p => !p.isBenched);
-      const benched = combined.filter(p => p.isBenched);
+      setPlayers(prevPlayers => {
+        const currentBenched = prevPlayers.filter(p => p.isBenched);
+        const formationPlayers = formation.players.map((p, index) => {
+            const existingPlayer = prevPlayers.find(ep => !ep.isBenched && ep.id.startsWith('p'));
+            return {...p, name: prevPlayers[index]?.name || p.name, isBenched: false};
+        });
+        const maxActive = parseInt(playerCount, 10);
+        
+        let combinedActive = [...formationPlayers];
+        let combinedBenched = [...currentBenched];
 
-      while (active.length > maxActive) {
-        const playerToBench = active.pop();
-        if(playerToBench) {
-          playerToBench.isBenched = true;
-          benched.unshift(playerToBench);
+        while (combinedActive.length > maxActive) {
+          const playerToBench = combinedActive.pop();
+          if(playerToBench) {
+            playerToBench.isBenched = true;
+            combinedBenched.unshift(playerToBench);
+          }
         }
-      }
+        
+        return [...combinedActive, ...combinedBenched];
+      });
 
-      setPlayers([...active, ...benched]);
       setSelectedFormationName(formationName);
     }
   };
@@ -269,30 +285,53 @@ export default function FormationEditor() {
 
   const handleDragStart = (e: DragEvent, playerId: string) => {
     e.dataTransfer.setData("playerId", playerId);
+    setDraggedPlayerId(playerId);
+  };
+  
+  const handleTouchStart = (playerId: string) => {
+    setDraggedPlayerId(playerId);
   };
 
   const handleDropOnPlayer = (e: DragEvent, targetPlayerId: string) => {
     e.preventDefault();
-    const sourcePlayerId = e.dataTransfer.getData("playerId");
-    if (sourcePlayerId === targetPlayerId) return;
+    const sourcePlayerId = e.dataTransfer.getData("playerId") || draggedPlayerId;
+    handlePlayerSwap(sourcePlayerId, targetPlayerId);
+    setDraggedPlayerId(null);
+  };
+
+  const handleTouchEndOnPlayer = (targetPlayerId: string) => {
+    if (!draggedPlayerId) return;
+    handlePlayerSwap(draggedPlayerId, targetPlayerId);
+    setDraggedPlayerId(null);
+  };
+
+  const handlePlayerSwap = (sourceId: string | null, targetId: string) => {
+    if (!sourceId || sourceId === targetId) return;
 
     setPlayers(prev => {
-      const sourcePlayer = prev.find(p => p.id === sourcePlayerId);
-      const targetPlayer = prev.find(p => p.id === targetPlayerId);
+        const sourceIndex = prev.findIndex(p => p.id === sourceId);
+        const targetIndex = prev.findIndex(p => p.id === targetId);
 
-      if (!sourcePlayer || !targetPlayer) return prev;
+        if (sourceIndex === -1 || targetIndex === -1) return prev;
 
-      // Swap their benched status and positions
-      return prev.map(p => {
-        if (p.id === sourcePlayerId) {
-          return { ...p, isBenched: targetPlayer.isBenched, position: targetPlayer.position };
+        const sourcePlayer = prev[sourceIndex];
+        const targetPlayer = prev[targetIndex];
+        
+        const newPlayers = [...prev];
+
+        // If players are in different lists (bench vs active), swap their roles
+        if (sourcePlayer.isBenched !== targetPlayer.isBenched) {
+            newPlayers[sourceIndex] = { ...targetPlayer, position: sourcePlayer.position };
+            newPlayers[targetIndex] = { ...sourcePlayer, position: targetPlayer.position };
+        } else {
+          // If in the same list, just swap their positions in the array to reorder
+          newPlayers[sourceIndex] = targetPlayer;
+          newPlayers[targetIndex] = sourcePlayer;
         }
-        if (p.id === targetPlayerId) {
-          return { ...p, isBenched: sourcePlayer.isBenched, position: sourcePlayer.position };
-        }
-        return p;
-      });
+
+        return newPlayers;
     });
+
     setSelectedFormationName("Custom");
   };
 
@@ -313,6 +352,17 @@ export default function FormationEditor() {
       onDragStart={(e) => handleDragStart(e, player.id)}
       onDrop={(e) => handleDropOnPlayer(e, player.id)}
       onDragOver={(e) => e.preventDefault()}
+      onTouchStart={() => handleTouchStart(player.id)}
+      onTouchEnd={(e) => {
+          const touch = e.changedTouches[0];
+          const element = document.elementFromPoint(touch.clientX, touch.clientY);
+          const targetLi = element?.closest('li');
+          const targetPlayerId = players.find(p => `player-li-${p.id}` === targetLi?.id)?.id
+          if (targetPlayerId) {
+            handleTouchEndOnPlayer(targetPlayerId);
+          }
+      }}
+      id={`player-li-${player.id}`}
     >
       <span className="flex-1 font-medium truncate">{player.name}</span>
       <Tooltip>
@@ -494,3 +544,5 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
+
+    
