@@ -451,11 +451,8 @@ export default function FormationEditor() {
   const handleExportImage = () => {
     const canvasElement = canvasRef.current;
     if (canvasElement) {
-      const computedStyle = getComputedStyle(canvasElement);
-      const backgroundColor = computedStyle.backgroundColor;
-      
       html2canvas(canvasElement, {
-        backgroundColor: backgroundColor,
+        backgroundColor: '#1A202C', // Dark background
         logging: false,
         useCORS: true,
         scale: 2 // Increase scale for better resolution

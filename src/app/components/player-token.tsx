@@ -80,8 +80,8 @@ export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchS
       onDrop={onDrop}
       onDragOver={handleDragOver}
     >
-      <span className="text-xs font-bold leading-tight truncate w-full px-1">{player.name}</span>
-      <span className="text-[0.6rem] font-medium leading-tight opacity-80 truncate w-full px-1">{player.positionName}</span>
+      <span className="text-xs font-bold leading-tight w-full px-1 whitespace-nowrap overflow-hidden text-ellipsis">{player.name}</span>
+      <span className="text-[0.6rem] font-medium leading-tight opacity-80 w-full px-1">{player.positionName}</span>
     </div>
   );
 }
