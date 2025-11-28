@@ -40,6 +40,12 @@ interface FormationSetup {
   selectedFormationNames: Record<PlayerCount, Record<PlayPhase, string>>;
 }
 
+interface SharedFormation {
+  playerCount: PlayerCount;
+  config: PhasePlayers;
+  formationNames: Record<PlayPhase, string>;
+}
+
 const initialFormationNames = {
   '11': { attacking: formations11[1].name, defending: formations11[1].name },
   '7': { attacking: formations7[0].name, defending: formations7[0].name },
@@ -76,12 +82,23 @@ export default function FormationEditor() {
     if (hash) {
       try {
         const decoded = atob(hash);
-        const data = JSON.parse(decoded);
-        if (data.playerConfigs && data.selectedFormationNames) {
+        const data: SharedFormation = JSON.parse(decoded);
+        if (data.playerCount && data.config && data.formationNames) {
+          setPlayerCount(data.playerCount);
+          setPlayerConfigs(prev => ({
+            ...prev,
+            [data.playerCount]: data.config,
+          }));
+          setSelectedFormationNames(prev => ({
+            ...prev,
+            [data.playerCount]: data.formationNames,
+          }));
+          toast({ title: "Shared formation loaded!", description: `The ${data.playerCount}-a-side formation has been loaded.` });
+          window.history.pushState("", document.title, window.location.pathname + window.location.search);
+        } else if (data.playerConfigs && data.selectedFormationNames) { // Legacy link support
           setPlayerConfigs(data.playerConfigs);
           setSelectedFormationNames(data.selectedFormationNames);
           toast({ title: "Shared formation loaded!", description: "The formation from the link has been loaded." });
-          // Clear the hash
           window.history.pushState("", document.title, window.location.pathname + window.location.search);
         }
       } catch (e) {
@@ -129,7 +146,7 @@ export default function FormationEditor() {
   }
 
   const handleResetFormation = () => {
-    const initialPlayers = initialPlayerConfigs[playerCount][playPhase];
+    const initialPlayers = playerCount === '11' ? initialPlayers11 : playerCount === '7' ? initialPlayers7 : initialPlayers6;
     const initialFormationName = initialFormationNames[playerCount][playPhase];
 
     setPlayerConfigs(prev => ({
@@ -360,7 +377,11 @@ export default function FormationEditor() {
   };
 
   const handleGenerateShareLink = () => {
-    const data: FormationSetup = { playerConfigs, selectedFormationNames };
+    const data: SharedFormation = { 
+      playerCount,
+      config: playerConfigs[playerCount],
+      formationNames: selectedFormationNames[playerCount],
+    };
     const jsonString = JSON.stringify(data);
     const encoded = btoa(jsonString);
     const link = `${window.location.origin}${window.location.pathname}#${encoded}`;
