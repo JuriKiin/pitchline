@@ -22,6 +22,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarProvider, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { cn } from '@/lib/utils';
 
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -85,6 +86,7 @@ export default function FormationEditor() {
   const [newSetupName, setNewSetupName] = useState('');
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareableLink, setShareableLink] = useState('');
+  const [isDraggingOverBench, setIsDraggingOverBench] = useState(false);
   
   useEffect(() => {
     const hash = window.location.hash.slice(1);
@@ -216,12 +218,9 @@ export default function FormationEditor() {
       name: 'New Player',
       positionName: 'SUB',
       position: { x: 50, y: 50 },
-      isBenched: activePlayers.length >= parseInt(playerCount, 10),
+      isBenched: true,
     };
     setPlayers(prev => [...prev, newPlayer]);
-    if (!newPlayer.isBenched) {
-      setSelectedFormationName("Custom");
-    }
   };
   
   const handleRemovePlayer = (id: string) => {
@@ -303,30 +302,9 @@ export default function FormationEditor() {
     setDraggedPlayerId(playerId);
   };
 
-  const handleTouchStart = (playerId: string) => {
-    setDraggedPlayerId(playerId);
-  };
-
-  const handleDropOnPlayer = (e: DragEvent, targetPlayerId: string) => {
-    e.preventDefault();
-    const sourcePlayerId = e.dataTransfer.getData("playerId") || draggedPlayerId;
-    if (sourcePlayerId && sourcePlayerId !== targetPlayerId) {
-        handlePlayerSwap(sourcePlayerId, targetPlayerId);
-    }
+  const handleDragEnd = () => {
     setDraggedPlayerId(null);
-  };
-
-  const handleTouchEndOnPlayer = (e: TouchEvent, targetPlayerId: string) => {
-    if (draggedPlayerId && draggedPlayerId !== targetPlayerId) {
-        const touch = e.changedTouches[0];
-        const endTarget = document.elementFromPoint(touch.clientX, touch.clientY);
-        const endPlayerId = endTarget?.closest('[data-player-id]')?.getAttribute('data-player-id');
-
-        if(endPlayerId) {
-          handlePlayerSwap(draggedPlayerId, endPlayerId);
-        }
-    }
-    setDraggedPlayerId(null);
+    setIsDraggingOverBench(false);
   };
   
   const handlePlayerSwap = (sourceId: string, targetId: string) => {
@@ -337,16 +315,14 @@ export default function FormationEditor() {
         if (sourceIndex === -1 || targetIndex === -1) return prev;
 
         const newPlayers = [...prev];
-        const sourcePlayer = newPlayers[sourceIndex];
-        const targetPlayer = newPlayers[targetIndex];
+        const sourcePlayer = { ...newPlayers[sourceIndex] };
+        const targetPlayer = { ...newPlayers[targetIndex] };
 
-        newPlayers[sourceIndex] = targetPlayer;
-        newPlayers[targetIndex] = sourcePlayer;
-
-        if (sourcePlayer.isBenched !== targetPlayer.isBenched) {
-            newPlayers[sourceIndex] = { ...targetPlayer, isBenched: sourcePlayer.isBenched, position: sourcePlayer.position };
-            newPlayers[targetIndex] = { ...sourcePlayer, isBenched: targetPlayer.isBenched, position: targetPlayer.position };
-        }
+        // Swap their core properties
+        newPlayers[sourceIndex].name = targetPlayer.name;
+        newPlayers[sourceIndex].positionName = targetPlayer.positionName;
+        newPlayers[targetIndex].name = sourcePlayer.name;
+        newPlayers[targetIndex].positionName = sourcePlayer.positionName;
 
         return newPlayers;
     });
@@ -354,6 +330,23 @@ export default function FormationEditor() {
     if(!players.find(p => p.id === sourceId)?.isBenched || !players.find(p => p.id === targetId)?.isBenched){
       setSelectedFormationName("Custom");
     }
+  };
+
+  const handleDropOnPlayer = (e: DragEvent, targetPlayerId?: string) => {
+    e.preventDefault();
+    const sourcePlayerId = e.dataTransfer.getData("playerId");
+
+    if (sourcePlayerId && targetPlayerId && sourcePlayerId !== targetPlayerId) {
+        handlePlayerSwap(sourcePlayerId, targetPlayerId);
+    } else if (sourcePlayerId && !targetPlayerId) {
+        // This case handles dropping a player onto the bench area
+        const targetIsBench = (e.target as HTMLElement).closest('[data-bench-dropzone="true"]');
+        if (targetIsBench) {
+            setPlayers(prev => prev.map(p => p.id === sourcePlayerId ? { ...p, isBenched: true } : p));
+            setSelectedFormationName("Custom");
+        }
+    }
+    setIsDraggingOverBench(false);
   };
 
   const handleSaveSetup = (e: FormEvent) => {
@@ -418,17 +411,16 @@ export default function FormationEditor() {
   
   const PlayerListItem = ({ player }: { player: Player }) => (
     <li
-      key={player.id}
       data-player-id={player.id}
       className="flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 cursor-grab"
       draggable
       onDragStart={(e) => handleDragStart(e, player.id)}
+      onDragEnd={handleDragEnd}
       onDrop={(e) => handleDropOnPlayer(e, player.id)}
       onDragOver={(e) => e.preventDefault()}
-      onTouchStart={() => handleTouchStart(player.id)}
-      onTouchEnd={(e) => handleTouchEndOnPlayer(e, player.id)}
     >
       <span className="flex-1 font-medium truncate">{player.name}</span>
+      <span className="text-xs text-muted-foreground w-8 text-center">{player.positionName}</span>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => handleStartEdit(player)}>
@@ -586,7 +578,14 @@ export default function FormationEditor() {
                     </Card>
                     
                     <Separator />
-                    <Card className="border-0 shadow-none rounded-none">
+                    <Card 
+                      className={cn("border-0 shadow-none rounded-none transition-colors", isDraggingOverBench && "bg-muted/50")}
+                      data-bench-dropzone="true"
+                      onDrop={handleDropOnPlayer}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDragEnter={() => setIsDraggingOverBench(true)}
+                      onDragLeave={() => setIsDraggingOverBench(false)}
+                    >
                       <CardHeader className="pt-4 pb-2">
                         <CardTitle className="text-lg flex items-center gap-2">
                           <Users className="h-5 w-5 text-muted-foreground" />
@@ -601,7 +600,7 @@ export default function FormationEditor() {
                             ))}
                           </ul>
                           ) : (
-                            <p className="text-sm text-muted-foreground">The bench is empty.</p>
+                            <p className="text-sm text-muted-foreground">The bench is empty. Drag players here to bench them.</p>
                           )}
                       </CardContent>
                     </Card>

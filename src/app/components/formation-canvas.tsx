@@ -8,7 +8,7 @@ interface FormationCanvasProps {
   players: Player[];
   previousPlayers: Player[];
   onPlayerPositionChange: (id: string, position: { x: number; y: number }) => void;
-  onPlayerDrop: (e: DragEvent, targetPlayerId: string) => void;
+  onPlayerDrop: (e: DragEvent, targetPlayerId?: string) => void;
 }
 
 export default function FormationCanvas({ players, previousPlayers, onPlayerPositionChange, onPlayerDrop }: FormationCanvasProps) {
@@ -72,22 +72,31 @@ export default function FormationCanvas({ players, previousPlayers, onPlayerPosi
   };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    if (!canvasRef.current) return;
-    const playerId = e.dataTransfer.getData("playerId");
-    if (!playerId) return;
+    e.preventDefault();
+    const draggedPlayerId = e.dataTransfer.getData('playerId');
+    if (!draggedPlayerId) return;
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const newXPercent = (x / rect.width) * 100;
-    const newYPercent = (y / rect.height) * 100;
-    
-    onPlayerPositionChange(playerId, { x: newXPercent, y: newYPercent });
+    // Check if dropping on the canvas itself (not a player token)
+    if ((e.target as HTMLElement).hasAttribute('data-canvas-dropzone')) {
+      if (!canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const newXPercent = (x / rect.width) * 100;
+      const newYPercent = (y / rect.height) * 100;
+      
+      onPlayerPositionChange(draggedPlayerId, { x: newXPercent, y: newYPercent });
+    } else {
+        // This case is handled by onPlayerDrop in PlayerToken for swaps,
+        // but we still call the main drop handler to consolidate logic if needed.
+        onPlayerDrop(e);
+    }
   };
 
   return (
-    <div className="relative w-full h-full bg-accent/30 dark:bg-accent/20 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none"
+    <div 
+      className="relative w-full h-full bg-accent/30 dark:bg-accent/20 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none"
       ref={canvasRef}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -96,13 +105,14 @@ export default function FormationCanvas({ players, previousPlayers, onPlayerPosi
       onTouchEnd={handleTouchEnd}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      data-canvas-dropzone="true"
     >
       {/* Field Markings */}
-      <div className="absolute top-1/2 left-0 w-full h-px bg-white/30 -translate-y-1/2" />
-      <div className="absolute top-1/2 left-1/2 w-[15%] aspect-square border-2 border-white/30 rounded-full -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute top-1/2 left-1/2 w-1.5 h-1.5 bg-white/30 rounded-full -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[35%] h-[18%] border-2 border-white/30 border-t-0 rounded-b-xl" />
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[35%] h-[18%] border-2 border-white/30 border-b-0 rounded-t-xl" />
+      <div className="absolute top-1/2 left-0 w-full h-px bg-white/30 -translate-y-1/2 pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 w-[15%] aspect-square border-2 border-white/30 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 w-1.5 h-1.5 bg-white/30 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[35%] h-[18%] border-2 border-white/30 border-t-0 rounded-b-xl pointer-events-none" />
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[35%] h-[18%] border-2 border-white/30 border-b-0 rounded-t-xl pointer-events-none" />
       
       {players.map(player => {
         const previousPlayer = previousPlayers.find(p => p.id === player.id);

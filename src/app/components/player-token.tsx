@@ -1,6 +1,6 @@
 'use client';
 
-import { DragEvent, useEffect, useState, useRef } from 'react';
+import { DragEvent, useEffect, useRef } from 'react';
 import type { Player } from '@/app/lib/types';
 import { cn } from '@/lib/utils';
 import { User } from 'lucide-react';
@@ -15,7 +15,6 @@ interface PlayerTokenProps {
 }
 
 export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchStart, isDragged, onDrop }: PlayerTokenProps) {
-  const [position, setPosition] = useState(oldPosition);
   const tokenRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,19 +26,31 @@ export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchS
         tokenRef.current.style.top = `calc(${oldPosition.y}% - 2rem)`;
         
         // Force a reflow to apply the initial position before the transition starts
-        // This is a common trick to make sure the transition doesn't get skipped by the browser.
         tokenRef.current.getBoundingClientRect(); 
 
         // Now, enable transitions and set the final position.
-        tokenRef.current.style.transition = 'left 0.3s ease-in-out, top 0.3s ease-in-out, transform 0.2s ease';
-        setPosition(player.position);
+        tokenRef.current.style.transition = 'left 0.3s ease-in-out, top 0.3s ease-in-out, transform 0.2s ease, background-color 0.2s ease-in-out';
+        tokenRef.current.style.left = `calc(${player.position.x}% - 2rem)`;
+        tokenRef.current.style.top = `calc(${player.position.y}% - 2rem)`;
     }
   }, [player.position, oldPosition]);
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer.setData("playerId", player.id);
+    // Add a slight delay to allow the ghost image to be created
+    setTimeout(() => {
+        if(tokenRef.current) {
+            tokenRef.current.style.opacity = '0.5';
+        }
+    }, 0);
   };
   
+  const handleDragEnd = () => {
+    if(tokenRef.current) {
+        tokenRef.current.style.opacity = '1';
+    }
+  };
+
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
   };
@@ -51,17 +62,19 @@ export default function PlayerToken({ player, oldPosition, onMouseDown, onTouchS
       data-player-id={player.id}
       className={cn(
         'absolute w-16 h-16 rounded-full bg-primary text-primary-foreground flex flex-col items-center justify-center text-center p-1 shadow-lg cursor-grab select-none',
+        'hover:bg-primary/80',
         isDragged && 'cursor-grabbing shadow-2xl scale-110 z-10'
       )}
       style={{
-        left: `calc(${position.x}% - 2rem)`,
-        top: `calc(${position.y}% - 2rem)`,
+        left: `calc(${player.position.x}% - 2rem)`,
+        top: `calc(${player.position.y}% - 2rem)`,
       }}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
       title={player.name}
       draggable
       onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onDrop={onDrop}
       onDragOver={handleDragOver}
     >
