@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User, ImageDown } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User, ImageDown, Palette } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -24,6 +24,7 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarProvider, 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
+import { Slider } from '@/components/ui/slider';
 
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -42,12 +43,26 @@ interface PlayerConfigs {
 interface FormationSetup {
   playerConfigs: PlayerConfigs;
   selectedFormationNames: Record<PlayerCount, Record<PlayPhase, string>>;
+  theme?: {
+    primary: HSL;
+    accent: HSL;
+  };
 }
 
 interface SharedFormation {
   playerCount: PlayerCount;
   config: PhasePlayers;
   formationNames: Record<PlayPhase, string>;
+  theme?: {
+    primary: HSL;
+    accent: HSL;
+  };
+}
+
+interface HSL {
+  h: number;
+  s: number;
+  l: number;
 }
 
 const initialFormationNames = {
@@ -89,6 +104,15 @@ export default function FormationEditor() {
   const [shareableLink, setShareableLink] = useState('');
   const [isDraggingOverBench, setIsDraggingOverBench] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const [primaryColor, setPrimaryColor] = useLocalStorage<HSL>('theme-primary', { h: 16, s: 100, l: 50 });
+  const [accentColor, setAccentColor] = useLocalStorage<HSL>('theme-accent', { h: 120, s: 60, l: 50 });
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--primary', `${primaryColor.h} ${primaryColor.s}% ${primaryColor.l}%`);
+    document.documentElement.style.setProperty('--ring', `${primaryColor.h} ${primaryColor.s}% ${primaryColor.l}%`);
+    document.documentElement.style.setProperty('--accent', `${accentColor.h} ${accentColor.s}% ${accentColor.l}%`);
+  }, [primaryColor, accentColor]);
   
   useEffect(() => {
     const hash = window.location.hash.slice(1);
@@ -106,6 +130,10 @@ export default function FormationEditor() {
             ...prev,
             [data.playerCount]: data.formationNames,
           }));
+          if (data.theme) {
+            setPrimaryColor(data.theme.primary);
+            setAccentColor(data.theme.accent);
+          }
           toast({ title: "Shared formation loaded!", description: `The ${data.playerCount}v${data.playerCount} formation has been loaded.` });
           window.history.pushState("", document.title, window.location.pathname + window.location.search);
         }
@@ -114,7 +142,7 @@ export default function FormationEditor() {
         toast({ title: "Error", description: "Could not load the shared formation from the link.", variant: "destructive" });
       }
     }
-  }, [toast]);
+  }, [toast, setPrimaryColor, setAccentColor]);
   
   const players = playerConfigs[playerCount][playPhase];
   const setPlayers = (newPlayers: Player[] | ((prevPlayers: Player[]) => Player[])) => {
@@ -252,12 +280,16 @@ export default function FormationEditor() {
   };
 
   const handleExport = () => {
-    const data = JSON.stringify({ playerConfigs, selectedFormationNames }, null, 2);
-    const blob = new Blob([data], { type: 'text/plain' });
+    const data = JSON.stringify({ 
+      playerConfigs, 
+      selectedFormationNames,
+      theme: { primary: primaryColor, accent: accentColor }
+    }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'pitchline-formation.txt';
+    a.download = 'pitchline-formation.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -282,7 +314,11 @@ export default function FormationEditor() {
             if (importedConfigs['11'] && importedConfigs['7'] && importedConfigs['6'] &&
                 importedConfigs['11'].attacking && importedConfigs['11'].defending) {
               setPlayerConfigs(importedConfigs);
-              setSelectedFormationNames(data.selectedFormationNames || selectedFormationNames);
+              setSelectedFormationNames(data.selectedFormationNames || initialFormationNames);
+              if (data.theme) {
+                setPrimaryColor(data.theme.primary);
+                setAccentColor(data.theme.accent);
+              }
               toast({ title: "Success", description: "Formations imported successfully." });
             } else {
                throw new Error("Invalid file format");
@@ -403,7 +439,11 @@ export default function FormationEditor() {
 
     const newSavedSetups = {
       ...savedSetups,
-      [newSetupName]: { playerConfigs, selectedFormationNames }
+      [newSetupName]: { 
+        playerConfigs, 
+        selectedFormationNames,
+        theme: { primary: primaryColor, accent: accentColor }
+      }
     };
     setSavedSetups(newSavedSetups);
     toast({ title: "Setup Saved", description: `"${newSetupName}" has been saved.` });
@@ -416,6 +456,10 @@ export default function FormationEditor() {
     if (setup) {
       setPlayerConfigs(setup.playerConfigs);
       setSelectedFormationNames(setup.selectedFormationNames);
+      if (setup.theme) {
+        setPrimaryColor(setup.theme.primary);
+        setAccentColor(setup.theme.accent);
+      }
       toast({ title: "Setup Loaded", description: `"${name}" has been loaded.` });
     }
   };
@@ -432,6 +476,10 @@ export default function FormationEditor() {
       playerCount,
       config: playerConfigs[playerCount],
       formationNames: selectedFormationNames[playerCount],
+      theme: {
+        primary: primaryColor,
+        accent: accentColor,
+      },
     };
     const jsonString = JSON.stringify(data);
     const encoded = btoa(jsonString);
@@ -463,7 +511,8 @@ export default function FormationEditor() {
       html2canvas(parent, {
         logging: false,
         useCORS: true,
-        scale: 2
+        scale: 2,
+        backgroundColor: '#1A202C'
       }).then(canvas => {
         const image = canvas.toDataURL('image/png');
         const link = document.createElement('a');
@@ -529,6 +578,20 @@ export default function FormationEditor() {
     previousPlayerConfig.current = players;
   }, [players]);
 
+  const ColorSlider = ({ label, value, onValueChange, max, step = 1 }: { label: string, value: number, onValueChange: (val: number) => void, max: number, step?: number }) => (
+    <div className="grid gap-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">{label}</Label>
+        <span className="text-xs text-muted-foreground">{value}</span>
+      </div>
+      <Slider
+        value={[value]}
+        onValueChange={([val]) => onValueChange(val)}
+        max={max}
+        step={step}
+      />
+    </div>
+  );
 
   return (
     <TooltipProvider>
@@ -557,7 +620,7 @@ export default function FormationEditor() {
                   </TooltipTrigger>
                   <TooltipContent><p>Manage Files</p></TooltipContent>
                 </Tooltip>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".txt,application/json" className="hidden" />
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
               </div>
             </div>
           </SidebarHeader>
@@ -633,6 +696,33 @@ export default function FormationEditor() {
                     </div>
                   </AccordionContent>
                 </AccordionItem>
+
+                 <AccordionItem value="appearance">
+                  <AccordionTrigger className="p-4 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Palette className="h-5 w-5" />
+                      Appearance
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="p-4 pt-0 space-y-6">
+                      <div className="space-y-4">
+                        <Label className="font-semibold">Player Color</Label>
+                        <ColorSlider label="Hue" value={primaryColor.h} onValueChange={(h) => setPrimaryColor(c => ({...c, h}))} max={360} />
+                        <ColorSlider label="Saturation" value={primaryColor.s} onValueChange={(s) => setPrimaryColor(c => ({...c, s}))} max={100} />
+                        <ColorSlider label="Lightness" value={primaryColor.l} onValueChange={(l) => setPrimaryColor(c => ({...c, l}))} max={100} />
+                      </div>
+                       <Separator />
+                      <div className="space-y-4">
+                        <Label className="font-semibold">Field Color</Label>
+                        <ColorSlider label="Hue" value={accentColor.h} onValueChange={(h) => setAccentColor(c => ({...c, h}))} max={360} />
+                        <ColorSlider label="Saturation" value={accentColor.s} onValueChange={(s) => setAccentColor(c => ({...c, s}))} max={100} />
+                        <ColorSlider label="Lightness" value={accentColor.l} onValueChange={(l) => setAccentColor(c => ({...c, l}))} max={100} />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
                 <AccordionItem value="players">
                   <AccordionTrigger className="p-4 font-semibold">
                     <div className="flex items-center gap-2">
