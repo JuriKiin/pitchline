@@ -6,7 +6,7 @@ import type { Player } from '@/app/lib/types';
 import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -20,37 +20,62 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/comp
 import { Separator } from '@/components/ui/separator';
 
 type PlayerCount = '11' | '7' | '6';
+type PlayPhase = 'attacking' | 'defending';
+
+interface PhasePlayers {
+  attacking: Player[];
+  defending: Player[];
+}
+
+interface PlayerConfigs {
+  '11': PhasePlayers;
+  '7': PhasePlayers;
+  '6': PhasePlayers;
+}
 
 export default function FormationEditor() {
-  const [playerConfigs, setPlayerConfigs] = useState({
-    '11': initialPlayers11,
-    '7': initialPlayers7,
-    '6': initialPlayers6,
+  const [playerConfigs, setPlayerConfigs] = useState<PlayerConfigs>({
+    '11': { attacking: initialPlayers11, defending: initialPlayers11 },
+    '7': { attacking: initialPlayers7, defending: initialPlayers7 },
+    '6': { attacking: initialPlayers6, defending: initialPlayers6 },
   });
   const [playerCount, setPlayerCount] = useState<PlayerCount>('11');
+  const [playPhase, setPlayPhase] = useState<PlayPhase>('attacking');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [editName, setEditName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
   const [selectedFormationNames, setSelectedFormationNames] = useState({
-    '11': formations11[1].name,
-    '7': formations7[0].name,
-    '6': formations6[0].name,
+    '11': { attacking: formations11[1].name, defending: formations11[1].name },
+    '7': { attacking: formations7[0].name, defending: formations7[0].name },
+    '6': { attacking: formations6[0].name, defending: formations6[0].name },
   });
   
-  const players = playerConfigs[playerCount];
+  const players = playerConfigs[playerCount][playPhase];
   const setPlayers = (newPlayers: Player[] | ((prevPlayers: Player[]) => Player[])) => {
     setPlayerConfigs(prev => {
-      const currentPlayers = prev[playerCount];
+      const currentPlayers = prev[playerCount][playPhase];
       const updatedPlayers = typeof newPlayers === 'function' ? newPlayers(currentPlayers) : newPlayers;
-      return { ...prev, [playerCount]: updatedPlayers };
+      return { 
+        ...prev, 
+        [playerCount]: {
+          ...prev[playerCount],
+          [playPhase]: updatedPlayers
+        } 
+      };
     });
   };
 
-  const selectedFormationName = selectedFormationNames[playerCount];
+  const selectedFormationName = selectedFormationNames[playerCount][playPhase];
   const setSelectedFormationName = (name: string) => {
-    setSelectedFormationNames(prev => ({ ...prev, [playerCount]: name }));
+    setSelectedFormationNames(prev => ({ 
+      ...prev, 
+      [playerCount]: {
+        ...prev[playerCount],
+        [playPhase]: name
+      } 
+    }));
   };
 
   const activePlayers = players.filter(p => !p.isBenched);
@@ -59,6 +84,10 @@ export default function FormationEditor() {
   const handlePlayerCountChange = (value: string) => {
     setPlayerCount(value as PlayerCount);
   };
+
+  const handlePhaseChange = (value: string) => {
+    setPlayPhase(value as PlayPhase);
+  }
   
   const handleFormationChange = (formationName: string) => {
     let formations: Formation[];
@@ -72,12 +101,10 @@ export default function FormationEditor() {
 
     const formation = formations.find(f => f.name === formationName);
     if (formation) {
-      // Keep benched players, but replace active players with formation players
       const currentBenched = players.filter(p => p.isBenched);
       const formationPlayers = formation.players.map(p => ({...p, isBenched: false}));
       const maxActive = parseInt(playerCount, 10);
       
-      // If we have too many players, bench some from the old formation
       const combined = [...formationPlayers, ...currentBenched];
       const active = combined.filter(p => !p.isBenched);
       const benched = combined.filter(p => p.isBenched);
@@ -140,7 +167,7 @@ export default function FormationEditor() {
   };
 
   const handleExport = () => {
-    const data = JSON.stringify({ playerCount, players }, null, 2);
+    const data = JSON.stringify({ playerConfigs }, null, 2);
     const blob = new Blob([data], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -163,19 +190,37 @@ export default function FormationEditor() {
       reader.onload = (event) => {
         try {
           const data = JSON.parse(event.target?.result as string);
-          if (data.playerCount && data.players) {
-            const importedCount = data.playerCount.toString() as PlayerCount;
-            // Ensure isBenched property exists
-            const importedPlayers = data.players.map((p: Player) => ({ ...p, isBenched: p.isBenched || false }));
-            setPlayerCount(importedCount);
-            setPlayerConfigs(prev => ({...prev, [importedCount]: importedPlayers}));
-            setSelectedFormationName("Custom");
-            toast({ title: "Success", description: "Formation imported successfully." });
+          if (data.playerConfigs) {
+            // Basic validation
+            const importedConfigs = data.playerConfigs;
+            if (importedConfigs['11'] && importedConfigs['7'] && importedConfigs['6'] &&
+                importedConfigs['11'].attacking && importedConfigs['11'].defending) {
+              setPlayerConfigs(importedConfigs);
+              setSelectedFormationName("Custom");
+              toast({ title: "Success", description: "Formations imported successfully." });
+            } else {
+               throw new Error("Invalid file format");
+            }
+          } else if (data.playerCount && data.players) { // Legacy import for backward compatibility
+             const importedCount = data.playerCount.toString() as PlayerCount;
+             const importedPlayers = data.players.map((p: Player) => ({ ...p, isBenched: p.isBenched || false }));
+             
+             setPlayerConfigs(prev => ({
+                ...prev,
+                [importedCount]: {
+                  attacking: importedPlayers,
+                  defending: JSON.parse(JSON.stringify(importedPlayers)) // deep copy
+                }
+             }));
+             setPlayerCount(importedCount);
+             setSelectedFormationName("Custom");
+             toast({ title: "Success", description: "Legacy formation imported successfully." });
+
           } else {
             throw new Error("Invalid file format");
           }
         } catch (error) {
-          toast({ title: "Import Error", description: "Failed to import formation. The file may be corrupt or in the wrong format.", variant: 'destructive' });
+          toast({ title: "Import Error", description: "Failed to import formations. The file may be corrupt or in the wrong format.", variant: 'destructive' });
         }
       };
       reader.readAsText(file);
@@ -362,12 +407,20 @@ export default function FormationEditor() {
           </div>
         </aside>
 
-        <main className="flex-1 p-4 md:p-6 bg-muted/30 dark:bg-card/20">
-          <FormationCanvas 
-            players={activePlayers} 
-            onPlayerPositionChange={handlePlayerPositionChange}
-            onPlayerDrop={handleDropOnPlayer}
-            />
+        <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/30 dark:bg-card/20">
+            <Tabs value={playPhase} onValueChange={handlePhaseChange} className="w-full mb-4">
+                <TabsList className="grid w-full grid-cols-2 max-w-sm mx-auto">
+                    <TabsTrigger value="attacking">Attacking</TabsTrigger>
+                    <TabsTrigger value="defending">Defending</TabsTrigger>
+                </TabsList>
+            </Tabs>
+            <div className="flex-1">
+                <FormationCanvas 
+                    players={activePlayers} 
+                    onPlayerPositionChange={handlePlayerPositionChange}
+                    onPlayerDrop={handleDropOnPlayer}
+                />
+            </div>
         </main>
 
         <Dialog open={!!editingPlayer} onOpenChange={(isOpen) => !isOpen && setEditingPlayer(null)}>
@@ -392,3 +445,5 @@ export default function FormationEditor() {
     </TooltipProvider>
   );
 }
+
+    
