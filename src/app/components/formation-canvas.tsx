@@ -1,6 +1,6 @@
 'use client';
 
-import { DragEvent, useRef, useState, TouchEvent } from 'react';
+import { DragEvent, useRef, useState, TouchEvent, forwardRef } from 'react';
 import type { Player } from '@/app/lib/types';
 import PlayerToken from './player-token';
 
@@ -14,7 +14,7 @@ interface FormationCanvasProps {
   draggedPlayer: Player | null;
 }
 
-export default function FormationCanvas({ 
+const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({ 
   players, 
   previousPlayers, 
   onPlayerPositionChange, 
@@ -22,13 +22,12 @@ export default function FormationCanvas({
   onTouchDrop,
   onTouchStart,
   draggedPlayer
-}: FormationCanvasProps) {
-  const canvasRef = useRef<HTMLDivElement>(null);
+}, ref) => {
   
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!draggedPlayer || !canvasRef.current) return;
+    if (!draggedPlayer || !ref || !('current' in ref) || !ref.current) return;
 
-    const rect = canvasRef.current.getBoundingClientRect();
+    const rect = ref.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
@@ -43,10 +42,10 @@ export default function FormationCanvas({
   };
 
   const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
-    if (!draggedPlayer || !canvasRef.current) return;
+    if (!draggedPlayer || !ref || !('current' in ref) || !ref.current) return;
     const touch = e.touches[0];
     if (touch) {
-      const rect = canvasRef.current.getBoundingClientRect();
+      const rect = ref.current.getBoundingClientRect();
       const x = touch.clientX - rect.left;
       const y = touch.clientY - rect.top;
 
@@ -68,7 +67,7 @@ export default function FormationCanvas({
   return (
     <div 
       className="relative w-full h-full bg-accent/30 dark:bg-accent/20 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none"
-      ref={canvasRef}
+      ref={ref}
       onMouseMove={handleMouseMove}
       onMouseUp={() => onTouchStart(null!)}
       onMouseLeave={() => onTouchStart(null!)}
@@ -104,5 +103,8 @@ export default function FormationCanvas({
       })}
     </div>
   );
-}
-    
+});
+
+FormationCanvas.displayName = "FormationCanvas";
+
+export default FormationCanvas;

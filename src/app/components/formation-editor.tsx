@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User, ImageDown } from 'lucide-react';
 import FormationCanvas from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -23,6 +23,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarProvider, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
+import html2canvas from 'html2canvas';
 
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -87,6 +88,7 @@ export default function FormationEditor() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareableLink, setShareableLink] = useState('');
   const [isDraggingOverBench, setIsDraggingOverBench] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     const hash = window.location.hash.slice(1);
@@ -371,6 +373,11 @@ export default function FormationEditor() {
         handlePlayerSwap(sourcePlayerId, targetPlayerId);
     } else {
         const touch = e.changedTouches[0];
+        if (!touch) {
+          setDraggedPlayer(null);
+          setIsDraggingOverBench(false);
+          return;
+        }
         const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
         const targetIsBench = targetElement?.closest('[data-bench-dropzone="true"]');
         const targetIsCanvas = targetElement?.hasAttribute('data-canvas-dropzone');
@@ -439,6 +446,23 @@ export default function FormationEditor() {
     }, () => {
       toast({ title: "Error", description: "Failed to copy the link.", variant: "destructive" });
     });
+  };
+
+  const handleExportImage = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      html2canvas(canvas, {
+        backgroundColor: null, // Use transparent background
+        logging: false,
+        useCORS: true,
+      }).then(canvas => {
+        const image = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'pitchline-formation.png';
+        link.href = image;
+        link.click();
+      });
+    }
   };
 
   let currentFormations: Formation[];
@@ -669,13 +693,21 @@ export default function FormationEditor() {
             </header>
 
             <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/30 dark:bg-card/20">
-                <div className="flex justify-center items-center mb-4 gap-4">
+                <div className="flex justify-center items-center mb-4 gap-2">
                   <Tabs value={playPhase} onValueChange={handlePhaseChange} className="w-full max-w-sm">
                       <TabsList className="grid w-full grid-cols-2">
                           <TabsTrigger value="attacking">Attacking</TabsTrigger>
                           <TabsTrigger value="defending">Defending</TabsTrigger>
                       </TabsList>
                   </Tabs>
+                   <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="icon" onClick={handleExportImage}>
+                        <ImageDown className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Export as Image</p></TooltipContent>
+                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button variant="outline" size="icon" onClick={handleResetFormation}>
@@ -687,6 +719,7 @@ export default function FormationEditor() {
                 </div>
                 <div className="flex-1">
                     <FormationCanvas 
+                        ref={canvasRef}
                         players={activePlayers}
                         previousPlayers={previousPlayerConfig.current?.filter(p => !p.isBenched) || []}
                         onPlayerPositionChange={handlePlayerPositionChange}
