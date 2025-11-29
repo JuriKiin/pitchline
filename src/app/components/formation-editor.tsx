@@ -180,12 +180,12 @@ const fieldColorOptions = [
 const playerColorOptions = [
   'hsl(16 100% 50%)',
   'hsl(210 100% 50%)',
-  'hsl(0 0% 100%)',
+  'hsl(260 80% 60%)',
   'hsl(0 0% 15%)',
   'hsl(45 100% 50%)',
   'hsl(310 80% 55%)',
   'hsl(180 100% 40%)',
-  'hsl(260 80% 60%)',
+  'hsl(0 80% 50%)',
 ];
 
 const initialFormationNames = {

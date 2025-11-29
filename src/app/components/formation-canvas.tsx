@@ -72,7 +72,6 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
     <div 
       className={cn(
         "relative w-full h-full rounded-lg border-2 border-dashed border-white/20 overflow-hidden touch-none",
-        "bg-cover bg-center",
         appearance.fieldPattern !== 'none' && `field-pattern-${appearance.fieldPattern}`
       )}
       style={{ backgroundColor: appearance.fieldColor }}
