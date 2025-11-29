@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useRef, ChangeEvent, FormEvent, DragEvent, TouchEvent, useEffect, useCallback } from 'react';
+import React, { useState, useRef, ChangeEvent, FormEvent, DragEvent, TouchEvent, useEffect, useCallback } from 'react';
 import { initialPlayers6, initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
 import type { Player } from '@/app/lib/types';
 import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
@@ -14,8 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User, ImageDown } from 'lucide-react';
-import FormationCanvas from './formation-canvas';
+import { Download, Upload, Plus, Pencil, Trash2, Users, RotateCcw, Save, Share2, Copy, FileArchive, Settings, User, ImageDown, Palette } from 'lucide-react';
+import FormationCanvas, { FieldPattern } from './formation-canvas';
 import { Logo } from './icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Separator } from '@/components/ui/separator';
@@ -25,8 +24,98 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarProvider, 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
-import React from 'react';
 
+// Helper Components defined outside the main component
+const SavedSetupMenuItem = React.memo(({ name, onLoad, onDelete }: { name: string; onLoad: (name: string) => void; onDelete: (name: string) => void; }) => {
+  const handleDeleteClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(name);
+  }, [onDelete, name]);
+
+  const handleSelect = useCallback(() => {
+    onLoad(name);
+  }, [onLoad, name]);
+
+  return (
+    <DropdownMenuItem onSelect={handleSelect} className="flex justify-between items-center">
+      <span>{name}</span>
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive" onClick={handleDeleteClick}>
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </DropdownMenuItem>
+  );
+});
+SavedSetupMenuItem.displayName = 'SavedSetupMenuItem';
+
+const PlayerListItem = React.memo(({ 
+    player, 
+    draggedPlayerId, 
+    onDragStart, 
+    onDragEnd, 
+    onDrop, 
+    onTouchStart, 
+    onTouchEnd, 
+    onStartEdit, 
+    onRemove 
+}: { 
+    player: Player;
+    draggedPlayerId: string | null;
+    onDragStart: (e: DragEvent, player: Player) => void;
+    onDragEnd: () => void;
+    onDrop: (e: DragEvent, playerId: string) => void;
+    onTouchStart: (player: Player) => void;
+    onTouchEnd: (e: TouchEvent, playerId: string) => void;
+    onStartEdit: (player: Player) => void;
+    onRemove: (id: string) => void;
+}) => {
+    
+    const handleEditClick = useCallback(() => onStartEdit(player), [onStartEdit, player]);
+    const handleRemoveClick = useCallback(() => onRemove(player.id), [onRemove, player.id]);
+    const handleDragStart = useCallback((e: DragEvent) => onDragStart(e, player), [onDragStart, player]);
+    const handleTouch = useCallback(() => onTouchStart(player), [onTouchStart, player]);
+    const handleDrop = useCallback((e: DragEvent) => onDrop(e, player.id), [onDrop, player.id]);
+    const handleTouchDrop = useCallback((e: TouchEvent) => onTouchEnd(e, player.id), [onTouchEnd, player.id]);
+
+    return (
+        <li
+            data-player-id={player.id}
+            className={cn(
+                "flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 cursor-grab",
+                draggedPlayerId === player.id && "opacity-50"
+            )}
+            draggable
+            onDragStart={handleDragStart}
+            onDragEnd={onDragEnd}
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onTouchStart={handleTouch}
+            onTouchEnd={handleTouchDrop}
+        >
+            <span className="flex-1 font-medium truncate">{player.name}</span>
+            <span className="text-xs text-muted-foreground w-8 text-center">{player.positionName}</span>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={handleEditClick}>
+                        <Pencil className="h-4 w-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Edit Player</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" onClick={handleRemoveClick}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Remove Player</p></TooltipContent>
+            </Tooltip>
+        </li>
+    );
+});
+PlayerListItem.displayName = 'PlayerListItem';
+
+
+// Main Component
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
 
@@ -52,6 +141,18 @@ interface SharedFormation {
   formationNames: Record<PlayPhase, string>;
 }
 
+export interface AppearanceSettings {
+  fieldColor: string;
+  playerColor: string;
+  fieldPattern: FieldPattern;
+}
+
+const initialAppearanceSettings: AppearanceSettings = {
+  fieldColor: 'hsl(120 60% 40%)', // Default dark green
+  playerColor: 'hsl(16 100% 50%)', // Default red-orange
+  fieldPattern: 'stripes-vertical',
+};
+
 const initialFormationNames = {
   '11': { attacking: formations11[1].name, defending: formations11[1].name },
   '7': { attacking: formations7[0].name, defending: formations7[0].name },
@@ -70,95 +171,6 @@ const positionOptions = [
   "LW", "RW", "ST", "CF", "SUB"
 ];
 
-const SavedSetupMenuItem = React.memo(({ name, onLoad, onDelete }: { name: string; onLoad: (name: string) => void; onDelete: (name: string) => void; }) => {
-  const handleDeleteClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDelete(name);
-  }, [onDelete, name]);
-
-  const handleSelect = useCallback(() => {
-    onLoad(name);
-  }, [onLoad, name]);
-
-  return (
-    <DropdownMenuItem onSelect={handleSelect} className="flex justify-between items-center">
-      <span>{name}</span>
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive" onClick={handleDeleteClick}>
-        <Trash2 className="h-4 w-4" />
-      </Button>
-    </DropdownMenuItem>
-  );
-});
-SavedSetupMenuItem.displayName = 'SavedSetupMenuItem';
-
-const PlayerListItem = React.memo(({ 
-    player, 
-    draggedPlayer, 
-    handleDragStart, 
-    handleDragEnd, 
-    handleDrop, 
-    handleTouchStart, 
-    handleTouchDrop, 
-    onStartEdit, 
-    onRemove 
-}: { 
-    player: Player;
-    draggedPlayer: Player | null;
-    handleDragStart: (e: DragEvent, player: Player) => void;
-    handleDragEnd: () => void;
-    handleDrop: (e: DragEvent, playerId: string) => void;
-    handleTouchStart: (player: Player) => void;
-    handleTouchDrop: (e: TouchEvent, playerId: string) => void;
-    onStartEdit: (player: Player) => void;
-    onRemove: (id: string) => void;
-}) => {
-    
-    const onEditClick = useCallback(() => {
-        onStartEdit(player);
-    }, [onStartEdit, player]);
-
-    const onRemoveClick = useCallback(() => {
-        onRemove(player.id);
-    }, [onRemove, player.id]);
-
-    return (
-        <li
-            data-player-id={player.id}
-            className={cn(
-                "flex items-center gap-2 p-2 rounded-md bg-card hover:bg-muted/50 cursor-grab",
-                draggedPlayer?.id === player.id && "opacity-50"
-            )}
-            draggable
-            onDragStart={(e) => handleDragStart(e, player)}
-            onDragEnd={handleDragEnd}
-            onDrop={(e) => handleDrop(e, player.id)}
-            onDragOver={(e) => e.preventDefault()}
-            onTouchStart={() => handleTouchStart(player)}
-            onTouchEnd={(e) => handleTouchDrop(e, player.id)}
-        >
-            <span className="flex-1 font-medium truncate">{player.name}</span>
-            <span className="text-xs text-muted-foreground w-8 text-center">{player.positionName}</span>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={onEditClick}>
-                        <Pencil className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Edit Player</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" onClick={onRemoveClick}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Remove Player</p></TooltipContent>
-            </Tooltip>
-        </li>
-    );
-});
-PlayerListItem.displayName = 'PlayerListItem';
-
 
 export default function FormationEditor() {
   const [playerConfigs, setPlayerConfigs] = useLocalStorage<PlayerConfigs>('footy-formation-configs', initialPlayerConfigs);
@@ -172,7 +184,7 @@ export default function FormationEditor() {
   const { toast } = useToast();
   
   const [selectedFormationNames, setSelectedFormationNames] = useLocalStorage('footy-formation-names', initialFormationNames);
-
+  const [appearance, setAppearance] = useLocalStorage<AppearanceSettings>('footy-appearance-settings', initialAppearanceSettings);
   const [savedSetups, setSavedSetups] = useLocalStorage<Record<string, FormationSetup>>('footy-formation-setups', {});
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
@@ -400,7 +412,7 @@ a.click();
     setDraggedPlayer(player);
   }, []);
 
-  const handleTouchStart = useCallback((player: Player) => {
+  const handleTouchStart = useCallback((player: Player | null) => {
     setDraggedPlayer(player);
   }, []);
 
@@ -474,17 +486,20 @@ a.click();
           return;
         }
         const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-        const targetIsBench = targetElement?.closest('[data-bench-dropzone="true"]');
-        const targetIsCanvas = targetElement?.hasAttribute('data-canvas-dropzone');
+        
+        if (targetElement) {
+          const targetIsBench = targetElement.closest('[data-bench-dropzone="true"]');
+          const targetIsCanvas = targetElement.hasAttribute('data-canvas-dropzone');
 
-        if (targetIsCanvas) {
-            const canvasRect = targetElement.getBoundingClientRect();
-            const x = (touch.clientX - canvasRect.left) / canvasRect.width * 100;
-            const y = (touch.clientY - canvasRect.top) / canvasRect.height * 100;
-            handlePlayerPositionChange(sourcePlayerId, {x, y});
-        } else if (targetIsBench) {
-            setPlayers(prev => prev.map(p => p.id === sourcePlayerId ? { ...p, isBenched: true } : p));
-            setSelectedFormationName("Custom");
+          if (targetIsCanvas) {
+              const canvasRect = targetElement.getBoundingClientRect();
+              const x = (touch.clientX - canvasRect.left) / canvasRect.width * 100;
+              const y = (touch.clientY - canvasRect.top) / canvasRect.height * 100;
+              handlePlayerPositionChange(sourcePlayerId, {x, y});
+          } else if (targetIsBench) {
+              setPlayers(prev => prev.map(p => p.id === sourcePlayerId ? { ...p, isBenched: true } : p));
+              setSelectedFormationName("Custom");
+          }
         }
     }
     setIsDraggingOverBench(false);
@@ -552,31 +567,36 @@ a.click();
       const parent = elementToCapture.parentElement;
       if (!parent) return;
   
+      // Temporarily set background for capture
       const originalBg = parent.style.backgroundColor;
-      const originalPadding = parent.style.padding;
-  
-      parent.style.backgroundColor = '#1A202C';
-      parent.style.padding = '2rem';
+      parent.style.backgroundColor = 'hsl(var(--background))';
   
       html2canvas(parent, {
-        logging: false,
         useCORS: true,
         scale: 2,
-        backgroundColor: '#1A202C'
+        backgroundColor: null, // Use parent's background
+        onclone: (doc) => {
+          const clonedElement = doc.querySelector<HTMLDivElement>('[data-canvas-dropzone="true"]');
+          if (clonedElement) {
+             clonedElement.style.backgroundColor = appearance.fieldColor;
+          }
+        }
       }).then(canvas => {
         const image = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = 'pitchline-formation.png';
         link.href = image;
         link.click();
-  
+        
         // Revert styles
         parent.style.backgroundColor = originalBg;
-        parent.style.padding = originalPadding;
       });
     }
-  }, []);
-  
+  }, [appearance.fieldColor]);
+
+  const handleAppearanceChange = useCallback((key: keyof AppearanceSettings, value: string) => {
+    setAppearance(prev => ({...prev, [key]: value}));
+  }, [setAppearance]);
 
   let currentFormations: Formation[];
   if (playerCount === '6') {
@@ -587,11 +607,6 @@ a.click();
     currentFormations = formations11;
   }
   
-  const previousPlayerConfig = useRef<Player[]>();
-  useEffect(() => {
-    previousPlayerConfig.current = players;
-  }, [players]);
-
   return (
     <TooltipProvider>
       <SidebarProvider>
@@ -625,7 +640,7 @@ a.click();
           </SidebarHeader>
           <SidebarContent>
             <ScrollArea>
-              <Accordion type="multiple" defaultValue={['settings', 'players']} className="w-full">
+              <Accordion type="multiple" defaultValue={['settings', 'players', 'appearance']} className="w-full">
                 <AccordionItem value="settings">
                   <AccordionTrigger className="p-4 font-semibold">
                     <div className="flex items-center gap-2">
@@ -690,6 +705,53 @@ a.click();
                     </div>
                   </AccordionContent>
                 </AccordionItem>
+                
+                <AccordionItem value="appearance">
+                   <AccordionTrigger className="p-4 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Palette className="h-5 w-5" />
+                      Appearance
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="p-4 pt-0 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="field-color">Field Color</Label>
+                         <Input 
+                            id="field-color"
+                            type="color" 
+                            value={appearance.fieldColor} 
+                            onChange={(e) => handleAppearanceChange('fieldColor', e.target.value)}
+                            className="w-16 h-8 p-1"
+                          />
+                      </div>
+                       <div className="flex items-center justify-between">
+                        <Label htmlFor="player-color">Player Color</Label>
+                         <Input 
+                            id="player-color"
+                            type="color" 
+                            value={appearance.playerColor} 
+                            onChange={(e) => handleAppearanceChange('playerColor', e.target.value)}
+                            className="w-16 h-8 p-1"
+                          />
+                      </div>
+                       <div>
+                        <Label className="text-sm font-medium mb-2 block">Field Pattern</Label>
+                        <Select value={appearance.fieldPattern} onValueChange={(v) => handleAppearanceChange('fieldPattern', v as FieldPattern)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select pattern" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="stripes-vertical">Stripes (Vertical)</SelectItem>
+                            <SelectItem value="stripes-horizontal">Stripes (Horizontal)</SelectItem>
+                            <SelectItem value="checkerboard">Checkerboard</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
 
                 <AccordionItem value="players">
                   <AccordionTrigger className="p-4 font-semibold">
@@ -713,12 +775,12 @@ a.click();
                               <PlayerListItem 
                                 key={player.id} 
                                 player={player}
-                                draggedPlayer={draggedPlayer}
-                                handleDragStart={handleDragStart}
-                                handleDragEnd={handleDragEnd}
-                                handleDrop={handleDrop}
-                                handleTouchStart={handleTouchStart}
-                                handleTouchDrop={handleTouchDrop}
+                                draggedPlayerId={draggedPlayer?.id || null}
+                                onDragStart={handleDragStart}
+                                onDragEnd={handleDragEnd}
+                                onDrop={handleDrop}
+                                onTouchStart={handleTouchStart}
+                                onTouchEnd={handleTouchDrop}
                                 onStartEdit={handleStartEdit}
                                 onRemove={handleRemovePlayer}
                               />
@@ -738,7 +800,6 @@ a.click();
                       onDragOver={(e) => e.preventDefault()}
                       onDragEnter={() => setIsDraggingOverBench(true)}
                       onDragLeave={() => setIsDraggingOverBench(false)}
-                      onTouchEnd={(e) => handleTouchDrop(e)}
                     >
                       <CardHeader className="pt-4 pb-2">
                         <CardTitle className="text-lg flex items-center gap-2">
@@ -753,12 +814,12 @@ a.click();
                                 <PlayerListItem 
                                     key={player.id} 
                                     player={player}
-                                    draggedPlayer={draggedPlayer}
-                                    handleDragStart={handleDragStart}
-                                    handleDragEnd={handleDragEnd}
-                                    handleDrop={handleDrop}
-                                    handleTouchStart={handleTouchStart}
-                                    handleTouchDrop={handleTouchDrop}
+                                    draggedPlayerId={draggedPlayer?.id || null}
+                                    onDragStart={handleDragStart}
+                                    onDragEnd={handleDragEnd}
+                                    onDrop={handleDrop}
+                                    onTouchStart={handleTouchStart}
+                                    onTouchEnd={handleTouchDrop}
                                     onStartEdit={handleStartEdit}
                                     onRemove={handleRemovePlayer}
                                 />
@@ -815,13 +876,12 @@ a.click();
                     <FormationCanvas 
                         ref={canvasRef}
                         players={activePlayers}
-                        previousPlayers={previousPlayerConfig.current?.filter(p => !p.isBenched) || []}
                         onPlayerPositionChange={handlePlayerPositionChange}
                         onPlayerDrop={handleDrop}
                         onTouchDrop={handleTouchDrop}
                         onTouchStart={handleTouchStart}
                         draggedPlayer={draggedPlayer}
-                        fieldPattern='stripes-vertical'
+                        appearance={appearance}
                     />
                 </div>
             </main>
@@ -916,7 +976,3 @@ a.click();
     </TooltipProvider>
   );
 }
-
-    
-
-    

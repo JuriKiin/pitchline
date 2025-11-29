@@ -1,31 +1,31 @@
 'use client';
 
-import { DragEvent, useRef, useState, TouchEvent, forwardRef } from 'react';
+import { DragEvent, useRef, forwardRef, TouchEvent } from 'react';
 import type { Player } from '@/app/lib/types';
 import PlayerToken from './player-token';
 import { cn } from '@/lib/utils';
+import { AppearanceSettings } from './formation-editor';
 
-type FieldPattern = 'none' | 'stripes-vertical' | 'stripes-horizontal' | 'diamonds-light' | 'diamonds-dark' | 'checkerboard';
+export type FieldPattern = 'none' | 'stripes-vertical' | 'stripes-horizontal' | 'checkerboard';
+
 interface FormationCanvasProps {
   players: Player[];
-  previousPlayers: Player[];
   onPlayerPositionChange: (id: string, position: { x: number; y: number }) => void;
   onPlayerDrop: (e: DragEvent, targetPlayerId?: string) => void;
   onTouchDrop: (e: TouchEvent, targetPlayerId?: string) => void;
-  onTouchStart: (player: Player) => void;
+  onTouchStart: (player: Player | null) => void;
   draggedPlayer: Player | null;
-  fieldPattern: FieldPattern;
+  appearance: AppearanceSettings;
 }
 
 const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({ 
   players, 
-  previousPlayers, 
   onPlayerPositionChange, 
   onPlayerDrop,
   onTouchDrop,
   onTouchStart,
   draggedPlayer,
-  fieldPattern = 'stripes-vertical'
+  appearance
 }, ref) => {
   
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -71,19 +71,20 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
   return (
     <div 
       className={cn(
-        "relative w-full h-full bg-accent dark:bg-accent/80 rounded-lg border-2 border-dashed border-accent/50 overflow-hidden touch-none",
-        "bg-cover bg-center"
+        "relative w-full h-full rounded-lg border-2 border-dashed border-white/20 overflow-hidden touch-none",
+        "bg-cover bg-center",
+        appearance.fieldPattern !== 'none' && `field-pattern-${appearance.fieldPattern}`
       )}
+      style={{ backgroundColor: appearance.fieldColor }}
       ref={ref}
       onMouseMove={handleMouseMove}
-      onMouseUp={() => onTouchStart(null!)}
-      onMouseLeave={() => onTouchStart(null!)}
+      onMouseUp={() => onTouchStart(null)}
+      onMouseLeave={() => onTouchStart(null)}
       onTouchMove={handleTouchMove}
       onTouchEnd={(e) => onTouchDrop(e)}
       onDragOver={handleDragOver}
       onDrop={onPlayerDrop}
       data-canvas-dropzone="true"
-      data-field-pattern={fieldPattern}
     >
       {/* Field Markings */}
       <div className="absolute top-1/2 left-0 w-full h-px bg-white/30 -translate-y-1/2 pointer-events-none" />
@@ -92,23 +93,18 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[35%] h-[18%] border-2 border-white/30 border-t-0 rounded-b-xl pointer-events-none" />
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[35%] h-[18%] border-2 border-white/30 border-b-0 rounded-t-xl pointer-events-none" />
       
-      {players.map(player => {
-        const previousPlayer = previousPlayers.find(p => p.id === player.id);
-        const oldPosition = previousPlayer ? previousPlayer.position : player.position;
-
-        return (
-          <PlayerToken
-            key={player.id}
-            player={player}
-            oldPosition={oldPosition}
-            onMouseDown={() => onTouchStart(player)}
-            onTouchStart={() => onTouchStart(player)}
-            isDragged={draggedPlayer?.id === player.id}
-            onDrop={(e) => onPlayerDrop(e, player.id)}
-            onTouchEnd={(e) => onTouchDrop(e, player.id)}
-          />
-        )
-      })}
+      {players.map(player => (
+        <PlayerToken
+          key={player.id}
+          player={player}
+          onMouseDown={() => onTouchStart(player)}
+          onTouchStart={() => onTouchStart(player)}
+          isDragged={draggedPlayer?.id === player.id}
+          onDrop={(e) => onPlayerDrop(e, player.id)}
+          onTouchEnd={(e) => onTouchDrop(e, player.id)}
+          playerColor={appearance.playerColor}
+        />
+      ))}
     </div>
   );
 });

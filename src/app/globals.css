@@ -58,12 +58,29 @@
 }
 
 @layer components {
-  [data-field-pattern="stripes-vertical"] {
+  .field-pattern-stripes-vertical {
     background-image: repeating-linear-gradient(90deg, 
       transparent, 
       transparent 10%, 
       rgba(255,255,255,0.05) 10%, 
       rgba(255,255,255,0.05) 20%
     );
+  }
+  .field-pattern-stripes-horizontal {
+    background-image: repeating-linear-gradient(0deg, 
+      transparent, 
+      transparent 10%, 
+      rgba(255,255,255,0.05) 10%, 
+      rgba(255,255,255,0.05) 20%
+    );
+  }
+  .field-pattern-checkerboard {
+    background-size: 80px 80px;
+    background-image:
+      linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%), 
+      linear-gradient(-45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.05) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.05) 75%);
+    background-position:0 0, 0 40px, 40px -40px, -40px 0px;
   }
 }
