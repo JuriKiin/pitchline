@@ -148,8 +148,8 @@ export interface AppearanceSettings {
 }
 
 const initialAppearanceSettings: AppearanceSettings = {
-  fieldColor: 'hsl(120 60% 40%)', // Default dark green
-  playerColor: 'hsl(16 100% 50%)', // Default red-orange
+  fieldColor: 'hsl(120 60% 40%)',
+  playerColor: 'hsl(16 100% 50%)',
   fieldPattern: 'stripes-vertical',
 };
 
