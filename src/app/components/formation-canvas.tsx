@@ -1,6 +1,6 @@
 'use client';
 
-import { DragEvent, useRef, forwardRef, TouchEvent } from 'react';
+import { DragEvent, useRef, forwardRef } from 'react';
 import type { Player } from '@/app/lib/types';
 import PlayerToken from './player-token';
 import { cn } from '@/lib/utils';
@@ -12,8 +12,6 @@ interface FormationCanvasProps {
   players: Player[];
   onPlayerPositionChange: (id: string, position: { x: number; y: number }) => void;
   onPlayerDrop: (e: DragEvent, targetPlayerId?: string) => void;
-  onTouchDrop: (e: TouchEvent, targetPlayerId?: string) => void;
-  onTouchStart: (player: Player | null) => void;
   draggedPlayer: Player | null;
   appearance: AppearanceSettings;
 }
@@ -22,8 +20,6 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
   players, 
   onPlayerPositionChange, 
   onPlayerDrop,
-  onTouchDrop,
-  onTouchStart,
   draggedPlayer,
   appearance
 }, ref) => {
@@ -45,25 +41,6 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
     onPlayerPositionChange(draggedPlayer.id, { x: newXPercent, y: newYPercent });
   };
 
-  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
-    if (!draggedPlayer || !ref || !('current' in ref) || !ref.current) return;
-    const touch = e.touches[0];
-    if (touch) {
-      const rect = ref.current.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-
-      const tokenHalfWidth = 32;
-      const clampedX = Math.max(tokenHalfWidth, Math.min(x, rect.width - tokenHalfWidth));
-      const clampedY = Math.max(tokenHalfWidth, Math.min(y, rect.height - tokenHalfWidth));
-
-      const newXPercent = (clampedX / rect.width) * 100;
-      const newYPercent = (clampedY / rect.height) * 100;
-
-      onPlayerPositionChange(draggedPlayer.id, { x: newXPercent, y: newYPercent });
-    }
-  };
-
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
   };
@@ -74,10 +51,6 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
       style={{ backgroundColor: appearance.fieldColor }}
       ref={ref}
       onMouseMove={handleMouseMove}
-      onMouseUp={() => onTouchStart(null)}
-      onMouseLeave={() => onTouchStart(null)}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={(e) => onTouchDrop(e)}
       onDragOver={handleDragOver}
       onDrop={onPlayerDrop}
       data-canvas-dropzone="true"
@@ -99,11 +72,8 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
         <PlayerToken
           key={player.id}
           player={player}
-          onMouseDown={() => onTouchStart(player)}
-          onTouchStart={() => onTouchStart(player)}
           isDragged={draggedPlayer?.id === player.id}
           onDrop={(e) => onPlayerDrop(e, player.id)}
-          onTouchEnd={(e) => onTouchDrop(e, player.id)}
           playerColor={appearance.playerColor}
         />
       ))}

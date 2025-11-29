@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, ChangeEvent, FormEvent, DragEvent, TouchEvent, useEffect, useCallback } from 'react';
+import React, { useState, useRef, ChangeEvent, FormEvent, DragEvent, useEffect, useCallback } from 'react';
 import { initialPlayers6, initialPlayers7, initialPlayers11 } from '@/app/lib/initial-data';
 import type { Player } from '@/app/lib/types';
 import { formations6, formations7, formations11, Formation } from '@/app/lib/formations';
@@ -53,8 +53,6 @@ const PlayerListItem = React.memo(({
     onDragStart, 
     onDragEnd, 
     onDrop, 
-    onTouchStart, 
-    onTouchEnd, 
     onStartEdit, 
     onRemove 
 }: { 
@@ -63,8 +61,6 @@ const PlayerListItem = React.memo(({
     onDragStart: (e: DragEvent, player: Player) => void;
     onDragEnd: () => void;
     onDrop: (e: DragEvent, playerId: string) => void;
-    onTouchStart: (player: Player) => void;
-    onTouchEnd: (e: TouchEvent, playerId: string) => void;
     onStartEdit: (player: Player) => void;
     onRemove: (id: string) => void;
 }) => {
@@ -78,13 +74,11 @@ const PlayerListItem = React.memo(({
         e.stopPropagation();
         onRemove(player.id);
     }, [onRemove, player.id]);
-
+    
     const stopPropagation = (e: React.SyntheticEvent) => e.stopPropagation();
 
-    const handleDragStart = useCallback((e: DragEvent) => onDragStart(e, player), [onDragStart, player]);
-    const handleTouch = useCallback(() => onTouchStart(player), [onTouchStart, player]);
-    const handleDrop = useCallback((e: DragEvent) => onDrop(e, player.id), [onDrop, player.id]);
-    const handleTouchDrop = useCallback((e: TouchEvent) => onTouchEnd(e, player.id), [onTouchEnd, player.id]);
+    const handleDragStartInternal = useCallback((e: DragEvent) => onDragStart(e, player), [onDragStart, player]);
+    const handleDropInternal = useCallback((e: DragEvent) => onDrop(e, player.id), [onDrop, player.id]);
 
     return (
         <li
@@ -94,12 +88,10 @@ const PlayerListItem = React.memo(({
                 draggedPlayerId === player.id && "opacity-50"
             )}
             draggable
-            onDragStart={handleDragStart}
+            onDragStart={handleDragStartInternal}
             onDragEnd={onDragEnd}
-            onDrop={handleDrop}
+            onDrop={handleDropInternal}
             onDragOver={(e) => e.preventDefault()}
-            onTouchStart={handleTouch}
-            onTouchEnd={handleTouchDrop}
         >
             <span className="flex-1 font-medium truncate">{player.name}</span>
             <span className="text-xs text-muted-foreground w-8 text-center">{player.positionName}</span>
@@ -478,10 +470,6 @@ a.click();
     setDraggedPlayer(player);
   }, []);
 
-  const handleTouchStart = useCallback((player: Player | null) => {
-    setDraggedPlayer(player);
-  }, []);
-
   const handleDragEnd = useCallback(() => {
     setDraggedPlayer(null);
     setIsDraggingOverBench(false);
@@ -535,43 +523,6 @@ a.click();
     setIsDraggingOverBench(false);
     setDraggedPlayer(null);
   }, [handlePlayerSwap, handlePlayerPositionChange, setPlayers, setSelectedFormationName]);
-
-  const handleTouchDrop = useCallback((e: TouchEvent, targetPlayerId?: string) => {
-    e.preventDefault();
-    if (!draggedPlayer) return;
-
-    const sourcePlayerId = draggedPlayer.id;
-
-    if (targetPlayerId && sourcePlayerId !== targetPlayerId) {
-        handlePlayerSwap(sourcePlayerId, targetPlayerId);
-    } else {
-        const touch = e.changedTouches[0];
-        if (!touch) {
-          setDraggedPlayer(null);
-          setIsDraggingOverBench(false);
-          return;
-        }
-        const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-        
-        if (targetElement) {
-          const targetIsBench = targetElement.closest('[data-bench-dropzone="true"]');
-          const targetIsCanvas = targetElement.hasAttribute('data-canvas-dropzone');
-
-          if (targetIsCanvas) {
-              const canvasRect = targetElement.getBoundingClientRect();
-              const x = (touch.clientX - canvasRect.left) / canvasRect.width * 100;
-              const y = (touch.clientY - canvasRect.top) / canvasRect.height * 100;
-              handlePlayerPositionChange(sourcePlayerId, {x, y});
-          } else if (targetIsBench) {
-              setPlayers(prev => prev.map(p => p.id === sourcePlayerId ? { ...p, isBenched: true } : p));
-              setSelectedFormationName("Custom");
-          }
-        }
-    }
-    setIsDraggingOverBench(false);
-    setDraggedPlayer(null);
-  }, [draggedPlayer, handlePlayerSwap, handlePlayerPositionChange, setPlayers, setSelectedFormationName]);
-
 
   const handleSaveSetup = useCallback((e: FormEvent) => {
     e.preventDefault();
@@ -855,8 +806,6 @@ a.click();
                                 onDragStart={handleDragStart}
                                 onDragEnd={handleDragEnd}
                                 onDrop={handleDrop}
-                                onTouchStart={handleTouchStart}
-                                onTouchEnd={handleTouchDrop}
                                 onStartEdit={handleStartEdit}
                                 onRemove={handleRemovePlayer}
                               />
@@ -894,8 +843,6 @@ a.click();
                                     onDragStart={handleDragStart}
                                     onDragEnd={handleDragEnd}
                                     onDrop={handleDrop}
-                                    onTouchStart={handleTouchStart}
-                                    onTouchEnd={handleTouchDrop}
                                     onStartEdit={handleStartEdit}
                                     onRemove={handleRemovePlayer}
                                 />
@@ -954,8 +901,6 @@ a.click();
                         players={activePlayers}
                         onPlayerPositionChange={handlePlayerPositionChange}
                         onPlayerDrop={handleDrop}
-                        onTouchDrop={handleTouchDrop}
-                        onTouchStart={handleTouchStart}
                         draggedPlayer={draggedPlayer}
                         appearance={appearance}
                     />

@@ -1,27 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { DragEvent, TouchEvent } from 'react';
+import { DragEvent } from 'react';
 import type { Player } from '@/app/lib/types';
 import { cn } from '@/lib/utils';
 
 interface PlayerTokenProps {
   player: Player;
-  onMouseDown: () => void;
-  onTouchStart: () => void;
   isDragged: boolean;
   onDrop: (e: DragEvent) => void;
-  onTouchEnd: (e: TouchEvent) => void;
   playerColor: string;
 }
 
 export default function PlayerToken({ 
   player, 
-  onMouseDown, 
-  onTouchStart, 
   isDragged, 
   onDrop, 
-  onTouchEnd,
   playerColor 
 }: PlayerTokenProps) {
   const handleDragStart = (e: DragEvent) => {
@@ -47,9 +41,6 @@ export default function PlayerToken({
         top: `calc(${player.position.y}% - 2.125rem)`,
         backgroundColor: playerColor,
       }}
-      onMouseDown={onMouseDown}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
       title={player.name}
       draggable
       onDragStart={handleDragStart}
