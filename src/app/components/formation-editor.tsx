@@ -69,8 +69,16 @@ const PlayerListItem = React.memo(({
     onRemove: (id: string) => void;
 }) => {
     
-    const handleEditClick = useCallback(() => onStartEdit(player), [onStartEdit, player]);
-    const handleRemoveClick = useCallback(() => onRemove(player.id), [onRemove, player.id]);
+    const handleEditClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onStartEdit(player);
+    }, [onStartEdit, player]);
+
+    const handleRemoveClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onRemove(player.id);
+    }, [onRemove, player.id]);
+
     const handleDragStart = useCallback((e: DragEvent) => onDragStart(e, player), [onDragStart, player]);
     const handleTouch = useCallback(() => onTouchStart(player), [onTouchStart, player]);
     const handleDrop = useCallback((e: DragEvent) => onDrop(e, player.id), [onDrop, player.id]);
