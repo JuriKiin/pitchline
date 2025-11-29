@@ -115,6 +115,19 @@ const PlayerListItem = React.memo(({
 PlayerListItem.displayName = 'PlayerListItem';
 
 
+const ColorSwatch = ({ color, isSelected, onClick }: { color: string, isSelected: boolean, onClick: () => void }) => (
+  <button
+    type="button"
+    className={cn(
+      'w-8 h-8 rounded-full border-2 transition-all',
+      isSelected ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-background' : 'border-transparent hover:border-muted-foreground/50'
+    )}
+    style={{ backgroundColor: color }}
+    onClick={onClick}
+    aria-label={`Select color ${color}`}
+  />
+);
+
 // Main Component
 type PlayerCount = '11' | '7' | '6';
 type PlayPhase = 'attacking' | 'defending';
@@ -152,6 +165,28 @@ const initialAppearanceSettings: AppearanceSettings = {
   playerColor: 'hsl(16 100% 50%)',
   fieldPattern: 'stripes-vertical',
 };
+
+const fieldColorOptions = [
+  'hsl(120 60% 40%)',
+  'hsl(110 50% 35%)',
+  'hsl(130 55% 45%)',
+  'hsl(125 40% 30%)',
+  'hsl(100 45% 40%)',
+  'hsl(120 30% 25%)',
+  'hsl(90 50% 42%)',
+  'hsl(135 48% 38%)',
+];
+
+const playerColorOptions = [
+  'hsl(16 100% 50%)',
+  'hsl(210 100% 50%)',
+  'hsl(0 0% 100%)',
+  'hsl(0 0% 15%)',
+  'hsl(45 100% 50%)',
+  'hsl(310 80% 55%)',
+  'hsl(180 100% 40%)',
+  'hsl(260 80% 60%)',
+];
 
 const initialFormationNames = {
   '11': { attacking: formations11[1].name, defending: formations11[1].name },
@@ -714,26 +749,32 @@ a.click();
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <div className="p-4 pt-0 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="field-color">Field Color</Label>
-                         <Input 
-                            id="field-color"
-                            type="color" 
-                            value={appearance.fieldColor} 
-                            onChange={(e) => handleAppearanceChange('fieldColor', e.target.value)}
-                            className="w-16 h-8 p-1"
-                          />
+                    <div className="p-4 pt-0 space-y-6">
+                      <div className="space-y-3">
+                        <Label>Field Color</Label>
+                        <div className="flex flex-wrap gap-3">
+                          {fieldColorOptions.map(color => (
+                            <ColorSwatch 
+                              key={color}
+                              color={color}
+                              isSelected={appearance.fieldColor === color}
+                              onClick={() => handleAppearanceChange('fieldColor', color)}
+                            />
+                          ))}
+                        </div>
                       </div>
-                       <div className="flex items-center justify-between">
-                        <Label htmlFor="player-color">Player Color</Label>
-                         <Input 
-                            id="player-color"
-                            type="color" 
-                            value={appearance.playerColor} 
-                            onChange={(e) => handleAppearanceChange('playerColor', e.target.value)}
-                            className="w-16 h-8 p-1"
-                          />
+                       <div className="space-y-3">
+                        <Label>Player Color</Label>
+                         <div className="flex flex-wrap gap-3">
+                           {playerColorOptions.map(color => (
+                            <ColorSwatch 
+                              key={color}
+                              color={color}
+                              isSelected={appearance.playerColor === color}
+                              onClick={() => handleAppearanceChange('playerColor', color)}
+                            />
+                          ))}
+                        </div>
                       </div>
                        <div>
                         <Label className="text-sm font-medium mb-2 block">Field Pattern</Label>
