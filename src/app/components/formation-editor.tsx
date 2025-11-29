@@ -79,6 +79,8 @@ const PlayerListItem = React.memo(({
         onRemove(player.id);
     }, [onRemove, player.id]);
 
+    const stopPropagation = (e: React.SyntheticEvent) => e.stopPropagation();
+
     const handleDragStart = useCallback((e: DragEvent) => onDragStart(e, player), [onDragStart, player]);
     const handleTouch = useCallback(() => onTouchStart(player), [onTouchStart, player]);
     const handleDrop = useCallback((e: DragEvent) => onDrop(e, player.id), [onDrop, player.id]);
@@ -103,7 +105,14 @@ const PlayerListItem = React.memo(({
             <span className="text-xs text-muted-foreground w-8 text-center">{player.positionName}</span>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={handleEditClick}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 cursor-pointer" 
+                      onClick={handleEditClick}
+                      onMouseDown={stopPropagation}
+                      onTouchStart={stopPropagation}
+                    >
                         <Pencil className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
@@ -111,7 +120,14 @@ const PlayerListItem = React.memo(({
             </Tooltip>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" onClick={handleRemoveClick}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive/80 hover:text-destructive cursor-pointer" 
+                      onClick={handleRemoveClick}
+                      onMouseDown={stopPropagation}
+                      onTouchStart={stopPropagation}
+                    >
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
@@ -993,8 +1009,7 @@ a.click();
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit">Save</Button>
-              </DialogFooter>
+                <Button type="submit">Save</Button>              </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
