@@ -70,10 +70,7 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
 
   return (
     <div 
-      className={cn(
-        "relative w-full h-full rounded-lg border-2 border-dashed border-white/20 overflow-hidden touch-none",
-        appearance.fieldPattern !== 'none' && `field-pattern-${appearance.fieldPattern}`
-      )}
+      className="relative w-full h-full rounded-lg border-2 border-dashed border-white/20 overflow-hidden touch-none"
       style={{ backgroundColor: appearance.fieldColor }}
       ref={ref}
       onMouseMove={handleMouseMove}
@@ -85,6 +82,12 @@ const FormationCanvas = forwardRef<HTMLDivElement, FormationCanvasProps>(({
       onDrop={onPlayerDrop}
       data-canvas-dropzone="true"
     >
+      <div 
+        className={cn(
+          "absolute inset-0 w-full h-full",
+          appearance.fieldPattern !== 'none' && `field-pattern-${appearance.fieldPattern}`
+        )} 
+      />
       {/* Field Markings */}
       <div className="absolute top-1/2 left-0 w-full h-px bg-white/30 -translate-y-1/2 pointer-events-none" />
       <div className="absolute top-1/2 left-1/2 w-[15%] aspect-square border-2 border-white/30 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
