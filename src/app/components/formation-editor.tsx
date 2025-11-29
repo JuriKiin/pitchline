@@ -237,7 +237,14 @@ export default function FormationEditor() {
   const [isDraggingOverBench, setIsDraggingOverBench] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   
+  const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted) return;
+
     const hash = window.location.hash.slice(1);
     if (hash) {
       try {
@@ -261,7 +268,7 @@ export default function FormationEditor() {
         toast({ title: "Error", description: "Could not load the shared formation from the link.", variant: "destructive" });
       }
     }
-  }, [toast, setPlayerConfigs, setSelectedFormationNames]);
+  }, [toast, setPlayerConfigs, setSelectedFormationNames, hasMounted]);
   
   const players = playerConfigs[playerCount][playPhase];
   const setPlayers = useCallback((newPlayers: Player[] | ((prevPlayers: Player[]) => Player[])) => {
@@ -650,6 +657,10 @@ a.click();
     currentFormations = formations11;
   }
   
+  if (!hasMounted) {
+    return null; // or a loading spinner
+  }
+
   return (
     <TooltipProvider>
       <SidebarProvider>
